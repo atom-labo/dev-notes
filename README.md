@@ -45,8 +45,6 @@
 - user.email: dev-user@example.com
 - hostname: dev-machine
 
----
-
 ## 🏗️ 環境方針
 
 - OS：Windows + WSL2（Ubuntu）
@@ -54,33 +52,6 @@
 - バージョン管理：Git（SSH接続）
 - 言語管理：pyenv
 - 仮想環境：venv
-
----
-
-## 🚀 よく使うコマンド
-
-### WSL 起動
-```powershell
-wsl
-````
-
-### WSL 状態確認
-
-```powershell
-wsl -l -v
-```
-
-### VS Code 起動（WSL）
-
-```bash
-code .
-```
-
-### Git push
-
-```bash
-git push
-```
 
 ---
 
@@ -101,14 +72,3 @@ git push
 * 学習単位でファイルを分割
 * 内容は随時リファクタリングする
 
-````
-
----
-
-## 反映
-
-```bash
-git add README.md
-git commit -m "docs: update README"
-git push
-````
