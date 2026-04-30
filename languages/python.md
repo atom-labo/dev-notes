@@ -23,7 +23,7 @@ which python
 
 ```bash
 Python 3.x.x
-/home/your-name/.pyenv/shims/python
+/home/dev-user/.pyenv/shims/python
 ```
 
 ---
@@ -75,7 +75,7 @@ source .venv/bin/activate
 成功例：
 
 ```bash
-(.venv) your-name@PC-NAME:~/projects/study/python$
+(.venv) dev-user@dev-machine:~/projects/study/python$
 ```
 
 ---
@@ -97,7 +97,7 @@ which python
 期待：
 
 ```bash
-/home/your-name/projects/study/python/.venv/bin/python
+/home/dev-user/projects/study/python/.venv/bin/python
 ```
 
 ---
