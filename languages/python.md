@@ -26,6 +26,7 @@ Python / Django の学習・実務知見を整理するためのメモ。
 ## 運用・インフラ
 
 - [運用・CI/CD](./python/05_operations.md)
+- [調査・コードリーディング](./python/06_debugging_and_code_reading.md)
 
 ## 用語集
 
