@@ -1,18 +1,14 @@
 # Python基礎
 
-Pythonの基本的な文法・概念の整理。
+実務でPythonを書く上で最低限押さえるべき言語仕様と考え方。
 
 ---
 
-# 概要
+# 方針
 
-Pythonは：
-
-- 動的型付け
-- シンプルな構文
-- 高い可読性
-
-が特徴。
+```text
+「書ける」より「バグらない・読みやすい」を優先
+````
 
 ---
 
@@ -23,46 +19,51 @@ Pythonは：
 ```python
 def add(a: int, b: int) -> int:
     return a + b
-````
+```
+
+---
+
+## 実務での位置づけ
+
+```text
+・型は実行時に強制されない
+・IDE / mypyでチェック
+・可読性とバグ防止が目的
+```
+
+---
+
+## よく使うパターン
+
+```python
+def func(x: int | None) -> int:
+    if x is None:
+        return 0
+    return x
+```
 
 ---
 
 ## ポイント
 
-* 実行時には強制されない
-* IDE / mypy などでチェックされる
-* 可読性向上が主目的
-
----
-
-## Optional（None許容）
-
-```python
-def get(value: int | None) -> int:
-    ...
-```
+* APIの入出力は基本つける
+* Service層は必須レベル
+* Domain層は明示した方が安全
 
 ---
 
 # mutable / immutable
 
-## immutable（変更不可）
+## 分類
 
-* int
-* str
-* tuple
-
----
-
-## mutable（変更可）
-
-* list
-* dict
-* set
+| 種類        | 例                 |
+| --------- | ----------------- |
+| immutable | int / str / tuple |
+| mutable   | list / dict / set |
 
 ---
 
-## 注意点
+## 重要な挙動
 
 ```python
 a = [1, 2]
@@ -70,6 +71,23 @@ b = a
 b.append(3)
 
 # aも変更される
+```
+
+---
+
+## 実務ポイント
+
+```text
+・list/dictは参照渡し
+・意図せず変更が伝播する
+```
+
+---
+
+## 対策
+
+```python
+b = a.copy()
 ```
 
 ---
@@ -94,16 +112,32 @@ def func(*args, **kwargs):
 
 ---
 
-## ポイント
+## 実務ポイント
 
-| 引数       | 内容      |
-| -------- | ------- |
-| *args    | 位置引数    |
-| **kwargs | キーワード引数 |
+```text
+*args → 位置引数
+**kwargs → 名前付き引数
+```
 
 ---
 
-# クラス / self
+## NGパターン
+
+```text
+引数が多すぎる関数
+```
+
+---
+
+## 推奨
+
+```text
+データ構造（dict / dataclass）にまとめる
+```
+
+---
+
+# クラス
 
 ## 基本
 
@@ -123,11 +157,11 @@ class User:
 
 ---
 
-## 利用
+## 実務ポイント
 
-```python
-user = User("Alice")
-print(user.name)
+```text
+・状態を持つものだけクラス化
+・ロジックだけなら関数で良い
 ```
 
 ---
@@ -149,8 +183,17 @@ class User:
 
 ## メリット
 
-* boilerplate削減
-* **init** 自動生成
+```text
+・__init__ 自動生成
+・可読性向上
+```
+
+---
+
+## 実務での使いどころ
+
+* DTO的用途
+* Domainの軽量オブジェクト
 
 ---
 
@@ -159,7 +202,7 @@ class User:
 ## 概要
 
 ```text
-メソッドを属性のように扱う
+メソッドを属性として扱う
 ```
 
 ---
@@ -178,10 +221,12 @@ class User:
 
 ---
 
-## 注意点
+## 実務ポイント
 
-* 重い処理は書かない
-* DBアクセスは注意
+```text
+・軽い処理のみ
+・DBアクセスはNG
+```
 
 ---
 
@@ -190,7 +235,7 @@ class User:
 ## 概要
 
 ```text
-関数に機能を追加する仕組み
+関数に横断処理を追加
 ```
 
 ---
@@ -198,37 +243,25 @@ class User:
 ## 例
 
 ```python
-def deco(func):
-    def wrapper():
-        print("before")
-        func()
+def log(func):
+    def wrapper(*args, **kwargs):
+        print("start")
+        return func(*args, **kwargs)
     return wrapper
-
-@deco
-def hello():
-    print("hello")
 ```
 
 ---
 
-## 用途
+## 実務用途
 
 * logging
 * 認証
 * transaction
+* retry
 
 ---
 
 # iterator / generator
-
-## iterator
-
-```python
-for x in [1, 2, 3]:
-    ...
-```
-
----
 
 ## generator
 
@@ -242,8 +275,17 @@ def gen():
 
 ## 特徴
 
-* 遅延評価
-* メモリ効率良い
+```text
+・遅延評価
+・メモリ効率良い
+```
+
+---
+
+## 実務用途
+
+* 大量データ処理
+* ストリーム処理
 
 ---
 
@@ -252,7 +294,7 @@ def gen():
 ## 概要
 
 ```text
-待ち時間中に他処理を進める
+I/O待ち時間の効率化
 ```
 
 ---
@@ -261,15 +303,118 @@ def gen():
 
 ```python
 async def fetch():
-    await something()
+    await external_api()
 ```
 
 ---
 
-## ポイント
+## 重要ポイント
 
-* CPU高速化ではない
-* I/O待ちに有効
+```text
+・CPUは速くならない
+・待ち時間を有効活用するだけ
+```
+
+---
+
+## よくある誤解
+
+```text
+async = 非同期処理（バックグラウンド）
+```
+
+→ ❌違う（Celeryがそれ）
+
+---
+
+# Noneの扱い
+
+## NG
+
+```python
+if x:
+```
+
+---
+
+## OK
+
+```python
+if x is None:
+```
+
+---
+
+## 理由
+
+```text
+0 / "" / False と区別できない
+```
+
+---
+
+# 比較演算
+
+## Python特有
+
+```python
+if 0 < x < 10:
+    ...
+```
+
+---
+
+## 可読性が高い
+
+---
+
+# 例外（exception）
+
+## 基本
+
+```python
+try:
+    ...
+except ValueError:
+    ...
+```
+
+---
+
+## raise
+
+```python
+raise ValueError("invalid")
+```
+
+---
+
+## 実務ポイント
+
+```text
+・例外は握り潰さない
+・意味のある例外を投げる
+```
+
+---
+
+# import
+
+## 基本
+
+```python
+import os
+from datetime import datetime
+```
+
+---
+
+## 実務ポイント
+
+```text
+・循環参照に注意
+・トップにまとめる
+```
 
 ---
 
@@ -285,11 +430,10 @@ async def fetch():
 
 ---
 
-# 注意点まとめ
+# よくある落とし穴
 
-* mutableの扱いに注意
-* 型は強制ではない
-* decoratorは関数を書き換える
-* asyncは万能ではない
-
----
+* mutableの参照共有
+* Noneチェックミス
+* 例外握り潰し
+* asyncの誤用
+* decoratorの副作用
