@@ -1,70 +1,231 @@
 # Django実務
 
-Djangoを実務で扱う際の設計・非同期処理・パフォーマンス・アーキテクチャの要点を整理する。
+Djangoを使った実務開発における設計・実装・運用の要点。
 
 ---
 
-# 概要
-
-実務では：
-
-- Viewは薄く
-- Serviceにロジック集約
-- DBアクセス最適化
-- 重い処理は非同期化
-
-が基本方針。
-
----
-
-# アーキテクチャ（fat service / thin view）
-
-## 方針
+# 方針
 
 ```text
-View：HTTPの入口（薄く）
-Service：業務ロジック（厚く）
+Djangoは「書く」より「どこに書くか」が重要
 ````
 
 ---
 
-## 例（良い）
+# アーキテクチャ（例）
 
-```python
-class UserView(APIView):
-    def post(self, request):
-        serializer = UserSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-
-        user = user_service.create_user(serializer.validated_data)
-        return Response(UserSerializer(user).data)
+```text
+presentations（View / Serializer）
+↓
+usecases（処理の流れ）
+↓
+domains（業務ルール）
+↓
+infrastructures（DB / 外部API）
+↓
+models（ORM）
 ```
 
 ---
 
-## Service
+# レイヤー責務
 
-```python
-from django.db import transaction
+| 層               | 役割               |
+| --------------- | ---------------- |
+| presentations   | HTTP入口           |
+| serializers     | 入出力 / validation |
+| usecases        | 処理の流れ            |
+| domains         | ビジネスルール          |
+| infrastructures | 技術実装             |
+| models          | DB               |
 
-@transaction.atomic
-def create_user(data):
-    user = User.objects.create(**data)
+---
 
-    transaction.on_commit(
-        lambda: send_welcome_mail_task.delay(user.id)
-    )
+# 処理フロー
 
-    return user
+```text
+request
+↓
+View
+↓
+Serializer（validate）
+↓
+Usecase
+↓
+Domain
+↓
+Repository
+↓
+DB
+↓
+Response
+```
+
+---
+
+# View設計
+
+## 原則
+
+```text
+薄くする
+```
+
+---
+
+## やること
+
+* request受け取り
+* serializer呼び出し
+* usecase呼び出し
+* response返却
+
+---
+
+## NG
+
+```text
+・ビジネスロジックを書く
+・DB操作を書く
+```
+
+---
+
+# Serializer設計
+
+## 役割
+
+```text
+入力検証 + データ変換
 ```
 
 ---
 
 ## ポイント
 
-* Viewにビジネスロジックを書かない
-* transactionはServiceで管理
-* 非同期処理はon_commitで実行
+```text
+・必須/任意の定義
+・型変換
+・validate
+```
+
+---
+
+## NG
+
+```text
+・DB操作
+・外部API呼び出し
+```
+
+---
+
+# Usecase設計（最重要）
+
+## 役割
+
+```text
+処理の流れ（オーケストレーション）
+```
+
+---
+
+## 例
+
+```text
+validate
+↓
+存在チェック
+↓
+保存
+↓
+非同期処理
+```
+
+---
+
+## ポイント
+
+```text
+・transaction管理
+・Domain呼び出し
+・Repository呼び出し
+```
+
+---
+
+# Domain設計
+
+## 役割
+
+```text
+業務ルール
+```
+
+---
+
+## 内容
+
+* Entity
+* ValueObject
+* DomainService
+
+---
+
+## ポイント
+
+```text
+・Djangoに依存しない
+・純粋Python
+```
+
+---
+
+# Repository設計
+
+## 役割
+
+```text
+DB操作の隠蔽
+```
+
+---
+
+## ポイント
+
+```text
+・ORMを閉じ込める
+・queryを集約する
+```
+
+---
+
+# ORM設計（重要）
+
+## 基本
+
+```python
+User.objects.filter(...)
+```
+
+---
+
+## 注意点
+
+```text
+・N+1問題
+・index設計
+・不要なクエリ
+```
+
+---
+
+## 対策
+
+```python
+select_related()
+prefetch_related()
+```
 
 ---
 
@@ -75,8 +236,7 @@ def create_user(data):
 ```python
 from django.db import transaction
 
-@transaction.atomic
-def func():
+with transaction.atomic():
     ...
 ```
 
@@ -84,298 +244,246 @@ def func():
 
 ## ポイント
 
-* DB操作の一貫性を保証
-* rollbackされる可能性を考慮
-
----
-
-## NG例
-
-```python
-with transaction.atomic():
-    user.save()
-    send_mail_task.delay()
+```text
+・整合性保証
+・Usecaseで管理
 ```
 
 ---
 
-## 正しい
+# 非同期処理（Celery）
+
+## 使う場面
+
+```text
+・メール送信
+・外部API
+・重い処理
+```
+
+---
+
+## 呼び出し
+
+```python
+task.delay(user_id)
+```
+
+---
+
+## 重要
 
 ```python
 transaction.on_commit(
-    lambda: send_mail_task.delay(user.id)
+    lambda: task.delay(user.id)
 )
 ```
 
 ---
 
-# Celery（非同期処理）
-
-## 概要
+## 理由
 
 ```text
-重い処理をバックグラウンドで実行
+rollback時に実行されるのを防ぐ
 ```
 
 ---
 
-## 構成
+# 冪等性（重要）
+
+## 定義
 
 ```text
-Django
- ↓
-Redis（queue）
- ↓
-Celery Worker
+何回実行しても結果が同じ
 ```
 
 ---
 
-## task定義
+## 例
 
 ```python
-from celery import shared_task
-
-@shared_task
-def send_mail_task(user_id):
-    ...
+if not user.mail_sent:
+    send_mail()
 ```
 
 ---
 
-## 実行
+# API設計
 
-```python
-send_mail_task.delay(user.id)
+## URL
+
+```text
+GET /users
+POST /users
+GET /users/{id}
 ```
 
 ---
 
 ## ポイント
 
-* requestをブロックしない
-* retry設計が重要
-* 引数はprimitive（idなど）を渡す
-
----
-
-# Redis
-
-## 用途
-
-* Celeryのqueue
-* cache
-* セッション
-
----
-
-## cache例
-
-```python
-from django.core.cache import cache
-
-data = cache.get("key")
-
-if data is None:
-    data = heavy_query()
-    cache.set("key", data, 300)
-```
-
----
-
-## 注意点
-
-* キャッシュの整合性
-* invalidation設計
-
----
-
-# パフォーマンスチューニング
-
-## N+1問題
-
-```python
-users = User.objects.all()
-
-for user in users:
-    print(user.profile.name)
-```
-
----
-
-## 対策
-
-### select_related
-
-```python
-User.objects.select_related("profile")
-```
-
----
-
-### prefetch_related
-
-```python
-User.objects.prefetch_related("groups")
-```
-
----
-
-## その他
-
-* only / values でカラム絞り込み
-* exists / count を適切に使う
-* index設計
-
----
-
-# async / await
-
-## 概要
-
 ```text
-I/O待ち時間を有効活用
+・名詞で表現
+・一貫性
 ```
 
 ---
+
+# エラーハンドリング
 
 ## 例
 
-```python
-async def view(request):
-    data = await external_api()
+```json
+{
+  "code": "INVALID_PARAMETER",
+  "message": "email is required"
+}
 ```
 
 ---
 
-## 注意点
-
-* CPU高速化ではない
-* sync ORMと混在に注意
-* Djangoはsync中心が多い
-
----
-
-# middleware
-
-## 概要
+## ポイント
 
 ```text
-横断的処理を共通化
+・形式を統一
+・フロントが扱いやすくする
 ```
 
 ---
 
-## 例
+# pagination
 
-* 認証
-* logging
-* トレースID
-* ロケール
+## offset
+
+```text
+/users?page=1&limit=10
+```
 
 ---
 
-# logging（実務）
+## cursor
+
+```text
+/users?cursor=xxx
+```
+
+---
+
+## 実務
+
+```text
+大規模 → cursor推奨
+```
+
+---
+
+# 設定（settings）
 
 ## 方針
 
 ```text
-構造化ログ（JSON）を利用
+環境ごとに分離
 ```
 
 ---
 
-## ポイント
+## 内容
 
-* stdout出力
-* request単位で追跡できるようにする
-* Datadogなどと連携
+* DB
+* SECRET_KEY
+* logging
+* 外部API
 
 ---
 
-# selector / repository
+# logging
 
-## selector
+## 方針
 
 ```text
-参照専用クエリ
-```
-
-```python
-def get_active_users():
-    return User.objects.filter(active=True)
+stdoutに出す（JSON）
 ```
 
 ---
 
-## repository
+## 理由
 
 ```text
-ORM抽象化（必要に応じて）
+・Docker
+・Datadog
+```
+
+---
+
+# テスト
+
+## 優先順位
+
+```text
+1. Usecase
+2. API
+3. Model
 ```
 
 ---
 
 ## ポイント
 
-* DjangoはORM直利用も多い
-* 大規模では分離されることもある
-
----
-
-# テスト（Django）
-
-## APIテスト
-
-```python
-from rest_framework.test import APIClient
-
-client = APIClient()
-response = client.get("/users/")
+```text
+・外部依存はmock
+・Celeryは同期化
 ```
 
 ---
 
-## Celeryテスト
+# パフォーマンス
 
-```python
-CELERY_TASK_ALWAYS_EAGER = True
+## チェックポイント
+
+* N+1
+* query数
+* index
+* cache
+
+---
+
+# セキュリティ
+
+## 基本
+
+```text
+・認証（Authentication）
+・認可（Permission）
 ```
 
 ---
 
-## ポイント
+## 注意
 
-* Service単位でテスト
-* 外部APIはmock
+```text
+ユーザーがアクセスして良いかを必ずチェック
+```
 
 ---
 
 # よくあるアンチパターン
 
-* fat view（ロジック詰め込み）
-* transaction内で外部API
-* N+1未対策
-* Celeryでオブジェクト渡す
-* グローバル状態依存
+* fat View
+* fat Model
+* Serviceなし
+* Serializerにロジック
+* transaction未使用
+* Celery乱用
 
 ---
 
-# Javaとの比較
+# Javaとの対応
 
-| Java（Spring）   | Django             |
-| -------------- | ------------------ |
-| @Transactional | transaction.atomic |
-| Service層       | service関数          |
-| JPA            | ORM                |
-| Message Queue  | Celery             |
-| Redis Cache    | Django cache       |
-
----
-
-# まとめ
-
-* Viewは薄く、Serviceにロジック集約
-* transactionと非同期の境界が重要
-* N+1は最優先で対策
-* Redis / Celeryは実務で必須
+| Java       | Django     |
+| ---------- | ---------- |
+| Controller | View       |
+| Service    | Usecase    |
+| Entity     | Domain     |
+| Repository | Repository |
+| JPA        | ORM        |
+| MQ         | Celery     |
