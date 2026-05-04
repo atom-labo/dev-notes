@@ -1,287 +1,363 @@
-# Glossary
+# 用語集（Glossary）
 
-Python / Django 関連の用語メモ。  
-後から追記・整理していく前提。
-
----
-
-# Python
-
-## virtualenv / venv
-
-Pythonの仮想環境。  
-プロジェクトごとに依存関係を分離する仕組み。
+Django / Python / Web開発で頻出する用語の整理。
 
 ---
 
-## pyenv
-
-Pythonのバージョン管理ツール。  
-複数のPythonバージョンを切り替え可能。
+# 基本用語
 
 ---
 
-## pip
+## API
 
-Pythonのパッケージ管理ツール。
-
----
-
-## requirements.txt
-
-依存パッケージ一覧。  
-再現性のある環境構築に利用。
+```text
+アプリケーション間のインターフェース
+````
 
 ---
 
-## uv
+## REST
 
-高速なPythonパッケージ管理ツール。  
-pip / venv の代替として利用されることもある。
-
----
-
-## Ruff
-
-Python用のLint / Formatterツール。
+```text
+リソース指向のAPI設計
+```
 
 ---
 
-## typing
+## HTTP
 
-型ヒント機能。  
-実行時ではなく静的解析で利用される。
-
----
-
-## decorator
-
-関数に機能を追加する仕組み。
+```text
+クライアントとサーバ間の通信プロトコル
+```
 
 ---
 
-## generator
+## JSON
 
-`yield` を使った遅延評価の仕組み。
-
----
-
-## async / await
-
-非同期処理の構文。  
-I/O待ち時間を有効活用する。
+```text
+データ交換フォーマット
+```
 
 ---
 
-# Django
-
-## Django
-
-Python製のWebフレームワーク。  
-ORMや認証などを標準提供。
-
----
-
-## Django REST Framework（DRF）
-
-DjangoでAPIを作るための拡張ライブラリ。
-
----
-
-## Model
-
-DBテーブル定義。
-
----
-
-## ORM
-
-データベース操作をPythonコードで行う仕組み。
-
----
-
-## migration
-
-DBスキーマ変更を管理する仕組み。
+# Django関連
 
 ---
 
 ## View
 
-リクエストを処理しレスポンスを返す部分。
+```text
+HTTPリクエストを受けてレスポンスを返す入口
+```
 
 ---
 
-## serializer
+## Serializer
 
-ModelとJSONの変換、およびバリデーションを行う。
-
----
-
-## middleware
-
-リクエスト/レスポンスの共通処理。
+```text
+入力検証とデータ変換を行う
+```
 
 ---
 
-## request
+## Model
 
-HTTPリクエスト情報を持つオブジェクト。
-
----
-
-## response
-
-HTTPレスポンス。
+```text
+DBテーブルの定義（ORM）
+```
 
 ---
 
-## transaction.atomic
+## ORM
 
-トランザクション管理。  
-処理の一貫性を保証する。
+```text
+DB操作をPythonコードで行う仕組み
+```
 
 ---
 
-# 非同期 / バックグラウンド処理
+## urls.py
+
+```text
+URLとViewの対応を定義
+```
+
+---
+
+## migration
+
+```text
+DB変更をコードで管理
+```
+
+---
+
+# アーキテクチャ
+
+---
+
+## Usecase
+
+```text
+処理の流れを定義する層
+```
+
+---
+
+## Domain
+
+```text
+ビジネスルールを持つ層
+```
+
+---
+
+## Entity
+
+```text
+業務上のデータ構造（IDを持つ）
+```
+
+---
+
+## Value Object
+
+```text
+値そのものを表すオブジェクト（不変）
+```
+
+---
+
+## Repository
+
+```text
+DB操作を抽象化する層
+```
+
+---
+
+## Infrastructure
+
+```text
+DB / 外部APIなど技術的実装
+```
+
+---
+
+## Presentation
+
+```text
+HTTPインターフェース（View / Serializer）
+```
+
+---
+
+# 非同期・処理
+
+---
 
 ## Celery
 
-バックグラウンドジョブ実行基盤。
+```text
+バックグラウンド処理を行うタスクキュー
+```
 
 ---
 
-## task
+## Worker
 
-Celeryで実行される非同期処理単位。
-
----
-
-## Redis
-
-インメモリデータストア。  
-Celeryのキューやキャッシュに使われる。
+```text
+Celeryタスクを実行するプロセス
+```
 
 ---
 
-## worker
+## Broker
 
-Celeryの処理実行プロセス。
-
----
-
-## retry
-
-失敗したタスクの再実行。
+```text
+タスクをキューイングする仕組み（Redisなど）
+```
 
 ---
 
-# パフォーマンス
+## 冪等性（Idempotency）
 
-## N+1問題
-
-ループ内で追加クエリが発生し、DBアクセスが増える問題。
-
----
-
-## select_related
-
-外部キーをJOINでまとめて取得する。
+```text
+何回実行しても結果が同じになる性質
+```
 
 ---
 
-## prefetch_related
+## transaction
 
-別クエリで取得し、Python側で結合する。
-
----
-
-## cache
-
-計算結果を保存して再利用する仕組み。
+```text
+DBの整合性を保つ処理単位
+```
 
 ---
 
-# 運用
-
-## Docker
-
-アプリケーション実行環境をコンテナ化する仕組み。
+# API設計
 
 ---
 
-## docker-compose
+## ステータスコード
 
-複数コンテナをまとめて管理するツール。
-
----
-
-## gunicorn
-
-Python用のWSGIサーバ。  
-Djangoを本番環境で動かすために利用。
+```text
+HTTPの結果を示すコード（200 / 400 / 500など）
+```
 
 ---
 
-## WSGI
+## pagination
 
-Python WebアプリとWebサーバを繋ぐ仕様。
-
----
-
-## ASGI
-
-非同期対応のインターフェース。
+```text
+データを分割して取得する仕組み
+```
 
 ---
 
-## nginx
+## offset方式
 
-リバースプロキシサーバ。  
-HTTPSや静的ファイル配信を担当。
-
----
-
-## CI/CD
-
-コード変更を自動でテスト・デプロイする仕組み。
+```text
+ページ番号で取得
+```
 
 ---
 
-## GitHub Actions
+## cursor方式
 
-GitHub上でCI/CDを実行する仕組み。
-
----
-
-## environment variables
-
-環境ごとに設定値を切り替える仕組み。
-
----
-
-# 設計
-
-## thin view
-
-Viewにロジックを持たせず、最小限にする設計。
-
----
-
-## fat service
-
-ビジネスロジックをService層に集約する設計。
+```text
+位置ベースで取得（大規模向け）
+```
 
 ---
 
 ## idempotency
 
-同じ処理を複数回実行しても結果が変わらない性質。
+```text
+同じ操作を複数回行っても結果が同じ
+```
 
 ---
 
-## immutable infrastructure
-
-環境は作り直す前提で運用する考え方。
+# Python関連
 
 ---
+
+## typing
+
+```text
+型ヒント（実行時には強制されない）
+```
+
+---
+
+## mutable
+
+```text
+変更可能なオブジェクト（list / dict）
+```
+
+---
+
+## immutable
+
+```text
+変更不可（int / str）
+```
+
+---
+
+## decorator
+
+```text
+関数に処理を追加する仕組み
+```
+
+---
+
+## generator
+
+```text
+遅延評価で値を生成する
+```
+
+---
+
+## async / await
+
+```text
+I/O待ち時間を効率化する仕組み
+```
+
+---
+
+# 運用
+
+---
+
+## Gunicorn
+
+```text
+Djangoを本番で動かすWSGIサーバ
+```
+
+---
+
+## Nginx
+
+```text
+リバースプロキシ / 静的ファイル配信
+```
+
+---
+
+## logging
+
+```text
+ログ出力の仕組み
+```
+
+---
+
+## request_id
+
+```text
+1リクエストを追跡するためのID
+```
+
+---
+
+## monitoring
+
+```text
+システムの状態を監視する仕組み
+```
+
+---
+
+# 調査・デバッグ
+
+---
+
+## Network
+
+```text
+ブラウザの通信ログ（DevTools）
+```
+
+---
+
+## stacktrace
+
+```text
+例外発生時の呼び出し履歴
+```
+
+---
+
+## N+1問題
+
+```text
+不要なDBクエリが大量発生する問題
+```
