@@ -1,18 +1,20 @@
 # トラブルシュート
 
-実務で頻出する問題と、その際に見るべきポイントを整理する。
+実務で頻出する問題と、その際に確認すべきポイントのチェックリスト。
 
 ---
 
-# 基本方針
+# 方針
 
 ```text
-事象 → 層の切り分け → 入出力確認 → 原因特定
+問題 → 原因パターン → 見る場所
 ````
 
 ---
 
-# よくある問題と確認ポイント
+# HTTPステータス別チェック
+
+---
 
 ## 400 Bad Request
 
@@ -29,8 +31,17 @@
 ```text
 Network payload
 ↓
-Serializer（validation）
+Serializer validation
 ```
+
+---
+
+### チェックポイント
+
+* request.dataの構造
+* 必須項目が揃っているか
+* 型（string / int / null）
+* serializerのvalidate処理
 
 ---
 
@@ -48,8 +59,16 @@ Serializer（validation）
 ```text
 request.user
 ↓
-認証設定（Authentication）
+Authentication設定
 ```
+
+---
+
+### チェックポイント
+
+* Authorizationヘッダ
+* トークンの有効期限
+* 認証方式（JWT / Session）
 
 ---
 
@@ -58,7 +77,7 @@ request.user
 ### 主な原因
 
 * 権限不足
-* 認可ロジックエラー
+* 認可ロジック不備
 
 ---
 
@@ -69,8 +88,17 @@ permission（DRF）
 ↓
 View
 ↓
-Usecase / Domain の認可処理
+Usecase / Domain
 ```
+
+---
+
+### チェックポイント
+
+* request.userの権限
+* 対象リソースとの関係
+* permissionクラス
+* ドメインの認可条件
 
 ---
 
@@ -79,7 +107,8 @@ Usecase / Domain の認可処理
 ### 主な原因
 
 * URLミス
-* ID条件不一致
+* ID不一致
+* データ未存在
 
 ---
 
@@ -90,8 +119,17 @@ urls.py
 ↓
 View
 ↓
-Repositoryのfilter条件
+Repository filter
 ```
+
+---
+
+### チェックポイント
+
+* path parameter
+* filter条件
+* soft delete（論理削除）
+* ID型（int / uuid）
 
 ---
 
@@ -99,8 +137,8 @@ Repositoryのfilter条件
 
 ### 主な原因
 
-* 例外未処理
-* 想定外の入力
+* 未処理例外
+* 想定外入力
 * DBエラー
 
 ---
@@ -110,12 +148,23 @@ Repositoryのfilter条件
 ```text
 backendログ（stacktrace）
 ↓
-View
-↓
 Usecase
 ↓
-例外発生箇所
+例外箇所
 ```
+
+---
+
+### チェックポイント
+
+* stacktraceの先頭エラー
+* None参照
+* transaction内処理
+* 外部APIエラー
+
+---
+
+# 事象別チェック
 
 ---
 
@@ -143,13 +192,22 @@ Repository query
 
 ---
 
+### チェックポイント
+
+* responseの中身
+* JSON構造
+* filter条件
+* select_related / prefetch_related
+
+---
+
 ## データが更新されない
 
 ### 主な原因
 
 * save / update漏れ
 * transaction未commit
-* Celeryに逃がしている
+* 非同期処理
 
 ---
 
@@ -158,12 +216,21 @@ Repository query
 ```text
 Usecase
 ↓
-Repository save処理
+Repository save
 ↓
 transaction
 ↓
-Celery呼び出し有無
+Celery
 ```
+
+---
+
+### チェックポイント
+
+* save呼び出し有無
+* transaction.atomic
+* Celeryに逃がしていないか
+* 冪等性の問題
 
 ---
 
@@ -184,8 +251,17 @@ Celery workerログ
 ↓
 task定義
 ↓
-Redis接続
+Redis
 ```
+
+---
+
+### チェックポイント
+
+* workerプロセス
+* キュー詰まり
+* retry状況
+* taskのimport漏れ
 
 ---
 
@@ -195,7 +271,7 @@ Redis接続
 
 * N+1問題
 * index不足
-* 不要なJOIN
+* 不要なクエリ
 
 ---
 
@@ -204,19 +280,58 @@ Redis接続
 ```text
 Repository query
 ↓
-EXPLAIN
+SQL（EXPLAIN）
 ↓
-select_related / prefetch_related
+ORM使用方法
 ```
 
 ---
 
-# 調査の進め方
+### チェックポイント
+
+* query回数
+* select_related / prefetch_related
+* index有無
+* 不要なループ内query
+
+---
+
+## ログが出ない / 追えない
+
+### 主な原因
+
+* logging設定不備
+* request_id未付与
+
+---
+
+### 見る場所
+
+```text
+settings.LOGGING
+↓
+middleware
+```
+
+---
+
+### チェックポイント
+
+* logger設定
+* handler
+* request_id
+* 出力形式（JSON）
+
+---
+
+# 調査の基本チェックリスト
+
+---
 
 ## Step1
 
 ```text
-Networkで事実確認
+Networkを確認したか？
 ```
 
 ---
@@ -224,19 +339,15 @@ Networkで事実確認
 ## Step2
 
 ```text
-どの層の問題か切り分け
+ログを確認したか？
 ```
-
-* Frontend
-* API
-* DB
 
 ---
 
 ## Step3
 
 ```text
-入力と出力を比較
+入力と出力を比較したか？
 ```
 
 ---
@@ -244,15 +355,23 @@ Networkで事実確認
 ## Step4
 
 ```text
-最後に正しかった地点を見つける
+どの層の問題か切り分けたか？
+```
+
+---
+
+## Step5
+
+```text
+最後に正しかった地点を特定したか？
 ```
 
 ---
 
 # よくあるアンチパターン
 
-* ログを見ない
-* Networkを見ない
 * いきなりコードを読む
+* Networkを見ない
+* ログを見ない
 * 仮説を立てない
-* フロントだけ / バックだけに原因を決めつける
+* フロント / バックのどちらかに決めつける
