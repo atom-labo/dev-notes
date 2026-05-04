@@ -1,33 +1,39 @@
-# Python / Django 学習メモ
+# Python / Django ナレッジ
 
-Python / Django の学習・実務知見を整理するためのメモ。
+Python・Djangoを中心とした実務ナレッジのまとめ。
 
 ---
 
 # 目次
 
-## 環境構築
-
-- [環境構築](./python/00_environment.md)
-
-## Python基礎
+## 1. 基礎
 
 - [Python基礎](./python/01_python_basics.md)
-
-## Python実務寄り
-
 - [Python実務](./python/02_python_practical.md)
 
-## Django
+---
+
+## 2. Django
 
 - [Django基礎](./python/03_django_basics.md)
 - [Django実務](./python/04_django_practical.md)
 
-## 運用・インフラ
+---
 
-- [運用・CI/CD](./python/05_operations.md)
+## 3. 運用
+
+- [運用（Django / インフラ）](./python/05_operations.md)
+
+---
+
+## 4. 調査・デバッグ
+
 - [調査・コードリーディング](./python/06_debugging_and_code_reading.md)
+- [トラブルシュート](./python/07_troubleshooting.md)
 
-## 用語集
+---
 
-- [Glossary](./python/99_glossary.md)
+## 5. 補助
+
+- [ログ設計](./python/08_logging.md)
+- [用語集](./python/99_glossary.md)
