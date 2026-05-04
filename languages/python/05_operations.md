@@ -1,211 +1,41 @@
-# 運用・CI/CD
+# Django運用
 
-Djangoアプリを実務で運用するための基盤・デプロイ・CI/CDの要点を整理する。
-
----
-
-# 概要
-
-運用では：
-
-- 実行環境の再現（Docker）
-- 安定したWebサーバ（gunicorn / ASGI）
-- 自動テスト・自動デプロイ（CI/CD）
-- 設定の外出し（環境変数）
-- 監視・ログ
-
-が重要。
+Djangoアプリケーションを実務で安定稼働させるための運用知識。
 
 ---
 
-# Docker
-
-## 概要
+# 方針
 
 ```text
-実行環境ごとコンテナ化する
+「動く」より「止まらない・追跡できる」
 ````
 
 ---
 
-## 目的
-
-* 環境差分の排除
-* 依存関係の固定
-* ローカルと本番の一致
-
----
-
-## Django構成イメージ
+# 全体構成（典型）
 
 ```text
-Browser
+Client（Frontend）
  ↓
-nginx
+Nginx（リバースプロキシ）
  ↓
-gunicorn / uvicorn
+Gunicorn（WSGIサーバ）
  ↓
 Django
  ↓
-PostgreSQL
-
-Redis
-Celery
+DB（PostgreSQL）
+ ↓
+Redis（Celery / Cache）
 ```
 
 ---
 
-## Dockerfile（例）
-
-```dockerfile
-FROM python:3.12
-
-WORKDIR /app
-
-COPY requirements.txt .
-RUN pip install -r requirements.txt
-
-COPY . .
-
-CMD ["python", "manage.py", "runserver"]
-```
-
----
-
-## docker-compose（例）
-
-```yaml
-services:
-  web:
-  db:
-  redis:
-  worker:
-```
-
----
-
-## volume
-
-```yaml
-volumes:
-  - .:/app
-```
-
----
-
-## ポイント
-
-* ローカルコードと同期
-* ホットリロード可能
-
----
-
-# 環境変数
-
-## 例
-
-```python
-import os
-
-SECRET_KEY = os.getenv("SECRET_KEY")
-```
-
----
-
-## 管理対象
-
-* DB接続情報
-* APIキー
-* SECRET_KEY
-
----
-
-## ポイント
-
-* コードに書かない
-* 環境ごとに切り替える
-
----
-
-# migration
-
-## 実行
-
-```bash
-python manage.py migrate
-```
-
----
-
-## ポイント
-
-```text
-DB変更もコードの一部
-```
-
----
-
-## 注意
-
-* deploy順序に注意
-* backward互換を意識
-
----
-
-# collectstatic
-
-```bash
-python manage.py collectstatic
-```
-
----
-
-## 役割
-
-* 静的ファイル集約
-* nginxから配信
-
----
-
-# gunicorn
-
-## 概要
-
-```text
-WSGIサーバ（本番用）
-```
-
----
-
-## 起動
-
-```bash
-gunicorn config.wsgi:application
-```
-
----
-
-## worker
-
-```bash
-gunicorn -w 4 config.wsgi
-```
-
----
-
-## ポイント
-
-* runserverは本番NG
-* worker数調整が重要
-
----
-
-# WSGI / ASGI
+# ① WSGI / ASGI
 
 ## WSGI
 
 ```text
-同期処理用インターフェース
+同期処理（標準）
 ```
 
 ---
@@ -218,66 +48,59 @@ gunicorn -w 4 config.wsgi
 
 ---
 
-## サーバ例
+## 実務
 
-| 種類   | サーバ              |
-| ---- | ---------------- |
-| WSGI | gunicorn         |
-| ASGI | uvicorn / daphne |
+```text
+API中心ならWSGIで十分なケースが多い
+```
 
 ---
 
-# nginx
+# ② Gunicorn
 
 ## 役割
 
-* reverse proxy
-* HTTPS
-* static配信
-* load balancing
-
----
-
-## 構成
-
 ```text
-Browser
- ↓
-nginx
- ↓
-gunicorn
- ↓
-Django
+Djangoを本番で動かすサーバ
 ```
 
 ---
 
-# Celery運用
+## 起動例
 
-## 構成
-
-```text
-web
-worker
-beat
+```bash
+gunicorn config.wsgi:application --workers 4 --bind 0.0.0.0:8000
 ```
 
 ---
 
-## ポイント
+## パラメータ
 
-* workerは別コンテナ
-* Redisがbroker
-* retry設計が重要
+| 項目      | 意味    |
+| ------- | ----- |
+| workers | プロセス数 |
+| bind    | ポート   |
 
 ---
 
-# CI/CD
-
-## 概要
+## 実務ポイント
 
 ```text
-コード変更を自動で検証・デプロイ
+・CPUコア数に応じて調整
+・worker不足 → 遅延
+・worker過多 → メモリ枯渇
+```
+
+---
+
+# ③ Nginx
+
+## 役割
+
+```text
+・リバースプロキシ
+・SSL終端
+・静的ファイル配信
 ```
 
 ---
@@ -285,218 +108,309 @@ beat
 ## 流れ
 
 ```text
-git push
- ↓
-CI
- ↓
-lint / test / build
- ↓
-CD
- ↓
-deploy
+Client → Nginx → Gunicorn → Django
 ```
 
 ---
 
-# CIでやること
+# ④ 静的ファイル
 
-## lint
+## collectstatic
 
 ```bash
-ruff check .
+python manage.py collectstatic
 ```
 
 ---
 
-## format check
+## 配信
 
-```bash
-ruff format --check .
-```
-
----
-
-## test
-
-```bash
-pytest
-```
-
----
-
-## type check
-
-```bash
-mypy
-```
-
----
-
-## security
-
-```bash
-pip-audit
-```
-
----
-
-## migration check
-
-```bash
-python manage.py makemigrations --check
-```
-
----
-
-# GitHub Actions
-
-## 例（概要）
-
-```yaml
-name: CI
-
-on:
-  push:
-
-jobs:
-  test:
-    steps:
-      - run: pytest
+```text
+Nginxから配信
 ```
 
 ---
 
 ## ポイント
 
-* 自動実行
-* pull requestでチェック
+```text
+Djangoで配信しない（本番）
+```
 
 ---
 
-# uv（CIでの利用）
+# ⑤ 環境変数
 
-```bash
-uv sync --frozen
-uv run pytest
+## 基本
+
+```python
+import os
+
+SECRET_KEY = os.getenv("SECRET_KEY")
 ```
+
+---
+
+## 管理対象
+
+* DB接続
+* APIキー
+* SECRET_KEY
 
 ---
 
 ## ポイント
 
-* 高速
-* 再現性高い
-
----
-
-# Docker build（CI）
-
-```bash
-docker build .
-```
-
----
-
-## 目的
-
-* buildエラー検知
-* 本番環境再現
-
----
-
-# デプロイ時の重要ポイント
-
-## migrationタイミング
-
 ```text
-アプリとDBの整合性
+コードにハードコードしない
 ```
 
 ---
 
-## healthcheck
-
-```text
-起動確認
-```
-
----
-
-## rollback
-
-```text
-失敗時に戻せる設計
-```
-
----
-
-# ログ
+# ⑥ logging
 
 ## 方針
 
 ```text
-stdoutへ出力
+stdoutに出力
 ```
 
 ---
 
 ## 理由
 
-* Dockerとの相性
-* 集約しやすい
+```text
+・Docker前提
+・ログ集約（Datadog / CloudWatch）
+```
 
 ---
 
-## 連携
+## 必須情報
+
+```text
+request_id
+user_id
+path
+status_code
+```
+
+---
+
+# ⑦ 監視
+
+## 観点
+
+```text
+・エラー率
+・レスポンスタイム
+・トラフィック
+```
+
+---
+
+## ツール例
 
 * Datadog
 * CloudWatch
+* Sentry
 
 ---
 
-# immutable infrastructure
-
-## 概要
+## ポイント
 
 ```text
-コンテナは作り直す前提
+「異常に気づける」ことが重要
+```
+
+---
+
+# ⑧ DB運用
+
+## 観点
+
+* index
+* slow query
+* connection数
+
+---
+
+## ポイント
+
+```text
+ORMでもSQLを意識する
+```
+
+---
+
+# ⑨ マイグレーション
+
+## コマンド
+
+```bash
+python manage.py makemigrations
+python manage.py migrate
+```
+
+---
+
+## 注意
+
+```text
+・本番での適用順序
+・ロールバック考慮
+```
+
+---
+
+# ⑩ Celery運用
+
+## 構成
+
+```text
+Django
+ ↓
+Redis（broker）
+ ↓
+Celery Worker
+```
+
+---
+
+## 起動
+
+```bash
+celery -A config worker -l info
+```
+
+---
+
+## 注意
+
+```text
+・Workerが落ちると処理されない
+・キュー詰まりに注意
+```
+
+---
+
+# ⑪ 非同期の注意点
+
+* retry前提で設計
+* 冪等性を確保
+* 引数はIDのみ
+
+---
+
+# ⑫ デプロイ
+
+## 流れ（例）
+
+```text
+コード更新
+↓
+ビルド（Docker）
+↓
+migration
+↓
+アプリ再起動
 ```
 
 ---
 
 ## ポイント
 
-* 手作業変更しない
-* stateは外部へ
+```text
+・migrationとコードの整合性
+・ダウンタイム最小化
+```
 
 ---
 
-# よくあるアンチパターン
+# ⑬ セキュリティ
 
-* runserverを本番で使う
-* migration忘れ
-* env変数未設定
-* container内で手作業
-* DB接続先をlocalhostにする
+## 基本設定
 
----
-
-# Javaとの比較
-
-| Java            | Django         |
-| --------------- | -------------- |
-| Tomcat          | gunicorn       |
-| Servlet         | WSGI           |
-| Spring Boot jar | Docker image   |
-| Jenkins         | GitHub Actions |
-| Redis           | Redis          |
+```python
+DEBUG = False
+SECURE_SSL_REDIRECT = True
+```
 
 ---
 
-# まとめ
+## 注意
 
-* Dockerで環境を統一
-* gunicornで本番実行
-* CI/CDで品質担保
-* 環境変数で設定管理
-* migrationは最重要
+```text
+・SECRET漏洩
+・CORS設定
+・認可漏れ
+```
+
+---
+
+# ⑭ パフォーマンス
+
+## チェック
+
+* N+1
+* キャッシュ
+* DB負荷
+
+---
+
+## 対策
+
+```text
+・Redis cache
+・query最適化
+```
+
+---
+
+# ⑮ キャッシュ
+
+## 例
+
+```text
+・Redis
+```
+
+---
+
+## 用途
+
+* APIレスポンス
+* セッション
+
+---
+
+# ⑯ トラブル対応の基本
+
+```text
+1. ログを見る
+2. Networkを見る
+3. 再現する
+4. 原因特定
+```
+
+---
+
+# よくある障害
+
+* 500エラー増加
+* DB接続枯渇
+* Celery停止
+* メモリ不足
+* ログ肥大
+
+---
+
+# Javaとの対応
+
+| Java         | Django   |
+| ------------ | -------- |
+| Tomcat       | Gunicorn |
+| Apache/Nginx | Nginx    |
+| Spring Boot  | Django   |
+| MQ           | Celery   |
+| APM          | Datadog  |
