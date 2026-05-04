@@ -1,11 +1,23 @@
 # 調査・コードリーディング
 
-## 画面事象からバックエンドまで追う流れ
+画面事象から原因箇所まで最短で到達するための手順と考え方。
+
+---
+
+# 方針
+
+```text
+調査は「勘」ではなく「順序」
+````
+
+---
+
+# 全体フロー（最重要）
 
 ```text
 画面
 ↓
-Chrome DevTools Network
+Chrome DevTools（Network）
 ↓
 フロントのAPI呼び出し
 ↓
@@ -24,11 +36,13 @@ domains
 infrastructures/repositories
 ↓
 models / DB
-````
+```
 
 ---
 
-## 最初に見るもの（Network）
+# Step1：まずNetworkを見る
+
+## 確認項目
 
 * Request URL
 * Method（GET / POST / PUT / PATCH / DELETE）
@@ -39,46 +53,178 @@ models / DB
 
 ---
 
-## 調査の基本方針
-
-### ① どこが責務かを切り分ける
+## ここで分かること
 
 ```text
-Frontendか？
-APIか？
-DBか？
+・どのAPIが呼ばれているか
+・成功しているか（200系 / 400系 / 500系）
+・入力と出力が正しいか
 ```
 
 ---
 
-### ② 入出力を確認する
+# Step2：問題の層を切り分ける
 
 ```text
-requestは正しいか？
-responseは正しいか？
+Frontend
+API（Django）
+DB
 ```
 
 ---
 
-### ③ 「どこでズレたか」を特定する
+## 判断基準
+
+| 状況           | 原因層          |
+| ------------ | ------------ |
+| APIレスポンスが正しい | Frontend     |
+| APIレスポンスが異常  | Backend      |
+| API自体が失敗     | Backend / DB |
+
+---
+
+# Step3：フロントを確認
+
+## 見る場所
 
 ```text
-Frontend → API → Usecase → DB
+src/api/
+src/services/
+src/features/
 ```
 
 ---
 
-### ④ 最後に正しかった地点を見つける
+## 確認内容
+
+* API URL
+* Payload生成
+* Responseのマッピング
+* エラーハンドリング
+
+---
+
+# Step4：バックエンド入口（urls.py）
 
 ```text
-そこから下が原因
+URL → Viewの対応を確認
 ```
 
 ---
 
-## 事象別の優先ルート
+## 見る順
 
-### 表示データがおかしい
+```text
+config/urls.py
+↓
+apps/*/urls.py
+```
+
+---
+
+# Step5：View
+
+## 見るポイント
+
+* 使用Serializer
+* 呼び出すUsecase
+* request.data / query_params
+* status code
+
+---
+
+## 注意
+
+```text
+Viewは処理の入口であり、本体ではない
+```
+
+---
+
+# Step6：Serializer
+
+## 見るポイント
+
+* 入力項目
+* 必須 / 任意
+* 型
+* validate処理
+* response構造
+
+---
+
+## よくある原因
+
+```text
+400系エラーはここが多い
+```
+
+---
+
+# Step7：Usecase
+
+## 見るポイント
+
+* 処理の流れ
+* transaction
+* Domain呼び出し
+* Repository呼び出し
+* Celery呼び出し
+
+---
+
+## 位置づけ
+
+```text
+事象の中心
+```
+
+---
+
+# Step8：Domain
+
+## 見るポイント
+
+* ビジネスルール
+* 条件分岐
+* バリデーション
+* 例外
+
+---
+
+## 判断
+
+```text
+仕様かバグかを判断する層
+```
+
+---
+
+# Step9：Repository / Model
+
+## 見るポイント
+
+* query条件
+* filter
+* save / update
+* index利用
+* N+1問題
+
+---
+
+## 典型問題
+
+```text
+・データが取れない
+・条件ミス
+・更新されない
+```
+
+---
+
+# 事象別の優先ルート
+
+## 表示データがおかしい
 
 ```text
 Network response
@@ -87,37 +233,27 @@ Frontend mapping
 ↓
 Serializer response
 ↓
-Usecase
-↓
 Repository query
 ```
 
 ---
 
-### 保存できない（400系）
+## 保存できない（400）
 
 ```text
-Network payload / status
+Payload
 ↓
 Serializer validation
 ↓
-Usecase
-↓
 Domain rule
-↓
-Repository save
 ```
 
 ---
 
-### 500エラー
+## 500エラー
 
 ```text
-Network response
-↓
 backend log（stacktrace）
-↓
-View
 ↓
 Usecase
 ↓
@@ -126,77 +262,88 @@ Usecase
 
 ---
 
-### 403 / 権限エラー
+## 403 / 権限エラー
 
 ```text
 request.user
 ↓
-permission（DRF）
+permission
 ↓
-View
-↓
-Usecase / Domainの認可判定
+Domain認可
 ```
 
 ---
 
-### データが存在しない（404）
+## 404
 
 ```text
-URL / path param
+URL / ID
 ↓
-View
-↓
-Repositoryのfilter条件
+Repository filter
 ```
 
 ---
 
-## フロント → バックエンドの追い方
+# 調査の思考パターン
 
-### フロント起点
-
-1. NetworkでAPI特定
-2. URLでコード検索（axios / fetch）
-3. API関数を確認
-4. Payload / Responseの組み立てを見る
-
----
-
-### バックエンド起点
-
-1. urls.py
-2. View
-3. Serializer
-4. Usecase
-5. Domain
-6. Repository
-
----
-
-## VSCodeで使う操作
-
-| 操作        | 目的                                     |
-| --------- | -------------------------------------- |
-| 全文検索      | URL / API名 / エラー文言を探す                  |
-| 定義へ移動     | 呼び出し先を追う                               |
-| 参照を検索     | 影響範囲を見る                                |
-| ファイル検索    | `urls.py`, `*usecase.py`, `serializer` |
-| Git blame | 変更経緯・意図を確認                             |
-
----
-
-## 調査時のコツ
-
-### コツ①
+## ① 入出力を疑う
 
 ```text
-いきなり深い層を見ない
+入力が正しいか
+出力が正しいか
 ```
 
 ---
 
-### コツ②
+## ② 「どこでズレたか」を探す
+
+```text
+Frontend → API → Usecase → DB
+```
+
+---
+
+## ③ 最後に正しかった地点を見つける
+
+```text
+そこから下が原因
+```
+
+---
+
+## ④ 仮説を立てる
+
+```text
+原因を予測してからコードを見る
+```
+
+---
+
+# VSCodeで使う操作
+
+| 操作        | 目的                          |
+| --------- | --------------------------- |
+| 全文検索      | URL / API名 / エラー文言          |
+| 定義へ移動     | 呼び出し先を追う                    |
+| 参照を検索     | 影響範囲確認                      |
+| ファイル検索    | urls / usecase / serializer |
+| Git blame | 変更履歴確認                      |
+
+---
+
+# よくある失敗
+
+* いきなり深い層を見る
+* Networkを見ない
+* ログを見ない
+* 仮説なしで読む
+* フロントだけ / バックだけで判断
+
+---
+
+# コツ
+
+## コツ①
 
 ```text
 まずNetworkで事実確認
@@ -204,22 +351,24 @@ Repositoryのfilter条件
 
 ---
 
-### コツ③
+## コツ②
 
 ```text
-ログとNetworkを紐付ける
+浅い層から順に追う
 ```
 
 ---
 
-### コツ④
+## コツ③
 
 ```text
-「なぜそうなるか」より
-「どこでそうなったか」を先に見る
+ログと突き合わせる
 ```
 
 ---
 
-いきなりDomainやRepositoryを見ない。
-まずNetworkでAPIを特定し、URLから順に下る。
+## コツ④
+
+```text
+「なぜ」より「どこで」を先に
+```
