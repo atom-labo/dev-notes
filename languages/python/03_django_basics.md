@@ -1,118 +1,58 @@
 # Django基礎
 
-Djangoの基本概念とWebアプリとしての流れを整理する。
+Djangoを「実務で使う」ための最小限の構造理解。
 
 ---
 
-# 概要
-
-Djangoは：
-
-- Python製のWebフレームワーク
-- ORM・認証・管理画面などを標準提供
-- 高速にWebアプリを構築できる
-
----
-
-# Djangoの位置づけ
+# 方針
 
 ```text
-Frontend（React / Next.js）
-    ↓ HTTP
-Django（Backend）
-    ↓
-PostgreSQL
+Django = HTTPリクエストを処理してレスポンスを返す仕組み
 ````
 
 ---
 
-# Djangoの特徴
+# 全体像
 
-* batteries included（全部入り）
-* ORM標準搭載
-* 管理画面あり
-* 認証機能あり
+```text
+Frontend
+ ↓
+HTTP
+ ↓
+Django
+ ↓
+DB（PostgreSQL）
+```
 
 ---
 
-# Djangoの構成（基本）
+# Djangoの役割
 
 ```text
-Model
+・リクエスト受付
+・処理（ロジック）
+・レスポンス返却
+```
+
+---
+
+# リクエスト処理の流れ（最重要）
+
+```text
+request
+↓
+urls.py
+↓
 View
-Template
+↓
+（Serializer / Usecase / ORM）
+↓
+response
 ```
 
 ---
 
-## 役割
-
-| 要素       | 内容      |
-| -------- | ------- |
-| Model    | DB定義    |
-| View     | リクエスト処理 |
-| Template | HTML表示  |
-
-※ API開発ではTemplateはほぼ使わない
-
----
-
-# request / response の流れ
-
-かなり重要。
-
----
-
-```text
-Browser
- ↓
-URL routing
- ↓
-View
- ↓
-ORM / Service
- ↓
-Response(JSON)
-```
-
----
-
-# request オブジェクト
-
-## 概要
-
-```text
-HTTPリクエストの情報を持つ
-```
-
----
-
-## よく使うもの
-
-```python
-request.method
-request.GET
-request.POST
-request.user
-request.headers
-```
-
----
-
-# URL routing
-
-## urls.py
-
-```python
-from django.urls import path
-from . import views
-
-urlpatterns = [
-    path("users/<int:id>/", views.get_user),
-]
-```
-
----
+# ① urls.py
 
 ## 役割
 
@@ -122,16 +62,29 @@ URLとViewを紐付ける
 
 ---
 
-# View
-
-## 基本
+## 例
 
 ```python
-def get_user(request, id):
-    return JsonResponse(...)
+from django.urls import path
+from .views import UserView
+
+urlpatterns = [
+    path("users/<int:id>/", UserView.as_view()),
+]
 ```
 
 ---
+
+## 実務ポイント
+
+```text
+・URLが入口
+・まずここを見る
+```
+
+---
+
+# ② View
 
 ## 役割
 
@@ -141,18 +94,79 @@ requestを受けてresponseを返す
 
 ---
 
-# Django REST Framework（DRF）
+## 例
 
-API開発ではほぼ必須。
+```python
+from rest_framework.views import APIView
+from rest_framework.response import Response
+
+class UserView(APIView):
+    def get(self, request, id):
+        return Response({"id": id})
+```
 
 ---
 
-## Response
+## 実務ポイント
+
+```text
+・処理は書かない（薄く）
+・Usecaseへ委譲
+```
+
+---
+
+# ③ requestオブジェクト
+
+## よく使うもの
 
 ```python
-from rest_framework.response import Response
+request.method
+request.data
+request.query_params
+request.user
+```
 
+---
+
+## 実務ポイント
+
+```text
+・data = body
+・query_params = URLパラメータ
+```
+
+---
+
+# ④ Response
+
+```python
 return Response({"name": "Alice"})
+```
+
+---
+
+## 実務ポイント
+
+```text
+・JSONで返す
+・status codeを明示する
+```
+
+---
+
+# ⑤ Django REST Framework（DRF）
+
+API開発では必須。
+
+---
+
+## 役割
+
+```text
+・request/responseの扱い簡略化
+・serializer
+・validation
 ```
 
 ---
@@ -163,13 +177,19 @@ return Response({"name": "Alice"})
 request.data
 ```
 
-JSON bodyを取得。
+---
+
+## Response
+
+```python
+return Response(data)
+```
 
 ---
 
-# ORM
+# ⑥ ORM（Model）
 
-## 概要
+## 役割
 
 ```text
 DB操作をPythonで行う
@@ -193,15 +213,16 @@ User.objects.create(name="Alice")
 
 ---
 
-## フィルタ
+## 実務ポイント
 
-```python
-User.objects.filter(active=True)
+```text
+・ORM = SQL
+・パフォーマンスに直結
 ```
 
 ---
 
-# Model
+# ⑦ Model
 
 ## 例
 
@@ -214,32 +235,27 @@ class User(models.Model):
 
 ---
 
-## ポイント
+## 実務ポイント
 
-* DBテーブルに対応
-* migrationで管理
-
----
-
-# migration
-
-## 作成
-
-```bash
-python manage.py makemigrations
+```text
+・DB定義そのもの
+・migrationで管理
 ```
 
 ---
 
-## 適用
+# ⑧ migration
+
+## コマンド
 
 ```bash
+python manage.py makemigrations
 python manage.py migrate
 ```
 
 ---
 
-## ポイント
+## 実務ポイント
 
 ```text
 DB変更 = コード変更
@@ -247,12 +263,13 @@ DB変更 = コード変更
 
 ---
 
-# serializer（DRF）
+# ⑨ Serializer（DRF）
 
-## 概要
+## 役割
 
 ```text
-Model ⇄ JSON 変換 + validation
+・入力検証
+・JSON変換
 ```
 
 ---
@@ -268,37 +285,21 @@ class UserSerializer(serializers.Serializer):
 
 ---
 
-## 利用
+## 実務ポイント
 
-```python
-serializer = UserSerializer(data=request.data)
-serializer.is_valid()
+```text
+・validationはここ
+・DB操作は書かない
 ```
 
 ---
 
-# middleware
+# ⑩ middleware
 
-## 概要
-
-```text
-request / response の共通処理
-```
-
----
-
-## イメージ
+## 役割
 
 ```text
-request
- ↓
-middleware
- ↓
-view
- ↓
-middleware
- ↓
-response
+request / responseの共通処理
 ```
 
 ---
@@ -308,62 +309,56 @@ response
 * 認証
 * ログ
 * CSRF
-* トレース
 
 ---
 
-# authentication
+## 実務ポイント
 
-## request.user
+```text
+・軽く保つ
+・横断処理のみ
+```
+
+---
+
+# ⑪ authentication
 
 ```python
 request.user
 ```
 
-ログインユーザー情報。
-
 ---
 
-# class-based view（CBV）
-
-## 例
-
-```python
-from rest_framework.views import APIView
-
-class UserView(APIView):
-    def get(self, request):
-        return Response(...)
-```
-
----
-
-## ポイント
-
-* 関数ベースより拡張しやすい
-* 実務でよく使う
-
----
-
-# exception handling
-
-## 例
-
-```python
-raise ValidationError("error")
-```
-
----
-
-## 動作
+## 実務ポイント
 
 ```text
-例外 → HTTPレスポンスへ変換
+・ログインユーザー
+・認可とは別
 ```
 
 ---
 
-# status code
+# ⑫ class-based view（CBV）
+
+## 例
+
+```python
+class UserView(APIView):
+    def get(self, request):
+        ...
+```
+
+---
+
+## 実務ポイント
+
+```text
+関数ベースより一般的
+```
+
+---
+
+# ⑬ ステータスコード
 
 | code | 意味           |
 | ---- | ------------ |
@@ -371,46 +366,27 @@ raise ValidationError("error")
 | 201  | Created      |
 | 400  | Bad Request  |
 | 401  | Unauthorized |
+| 403  | Forbidden    |
 | 404  | Not Found    |
 
 ---
 
-# Djangoの役割まとめ
-
-```text
-HTTP requestを受けて
-↓
-DBやロジックを処理し
-↓
-HTTP responseを返す
-```
-
----
-
-# Javaとの比較
+# ⑭ Javaとの対応
 
 | Java（Spring） | Django     |
 | ------------ | ---------- |
 | Controller   | View       |
-| Service      | （別途実装）     |
+| Service      | Usecase    |
 | Repository   | ORM        |
 | Entity       | Model      |
 | DTO          | Serializer |
 
 ---
 
-# 注意点
+# よくあるアンチパターン
 
-* Viewにロジックを書きすぎない
-* ORMの使い方で性能が変わる
-* migration管理は重要
-* serializerはAPIの境界
-
----
-
-# まとめ
-
-* DjangoはWebアプリの土台
-* request → view → response の流れを理解する
-* ORMとserializerが重要
-* DRFを使うのが基本
+* Viewにロジックを書く
+* ORMを雑に使う
+* migrationを理解していない
+* SerializerでDB操作
+* 認可を考慮していない
