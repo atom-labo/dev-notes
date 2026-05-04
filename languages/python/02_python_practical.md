@@ -1,18 +1,14 @@
 # Python実務
 
-実務でよく使うPythonの機能・設計・考え方の整理。
+実務で頻出する機能・設計パターン・注意点の整理。
 
 ---
 
-# 概要
+# 方針
 
-Python実務では：
-
-- 可読性
-- 再利用性
-- テスト容易性
-
-が重要になる。
+```text
+「動くコード」ではなく「壊れにくいコード」を書く
+````
 
 ---
 
@@ -23,11 +19,11 @@ Python実務では：
 ```python
 def func(x: int) -> str:
     return str(x)
-````
+```
 
 ---
 
-## よく使う型
+## 実務でよく使う型
 
 ```python
 from typing import List, Dict
@@ -47,23 +43,17 @@ def func(x: int | None) -> int:
 
 ---
 
-## ポイント
+## 実務ポイント
 
-* 実行時には強制されない
-* IDE / mypyでチェック
-* 可読性向上
+```text
+・API入出力は必須レベル
+・Service層は強く推奨
+・型が仕様書の代わりになる
+```
 
 ---
 
 # logging
-
-## 概要
-
-```text
-printではなく logging を使う
-```
-
----
 
 ## 基本
 
@@ -79,20 +69,22 @@ logger.info("message")
 
 ## レベル
 
-| レベル      | 用途   |
-| -------- | ---- |
-| DEBUG    | 詳細   |
-| INFO     | 通常ログ |
-| WARNING  | 注意   |
-| ERROR    | エラー  |
-| CRITICAL | 致命的  |
+| レベル     | 用途  |
+| ------- | --- |
+| DEBUG   | 詳細  |
+| INFO    | 通常  |
+| WARNING | 注意  |
+| ERROR   | エラー |
 
 ---
 
-## ポイント
+## 実務ポイント
 
-* printは使わない
-* 構造化ログを意識する（JSONなど）
+```text
+・printは使わない
+・構造化ログ（JSON）前提で設計
+・request単位で追跡できるようにする
+```
 
 ---
 
@@ -117,49 +109,70 @@ raise ValueError("invalid")
 
 ---
 
-## ポイント
-
-* 例外は握り潰さない
-* 必要に応じて再throw
-
----
-
-## 例外の流れ
+## 実務ポイント
 
 ```text
-raise → 上位へ伝播 → handlerで処理
+・例外は握り潰さない
+・適切な層で処理する
+・ドメイン例外とシステム例外を分ける
 ```
 
 ---
 
-# import / module
+## NG
+
+```python
+except Exception:
+    pass
+```
+
+---
+
+# import / module設計
 
 ## 基本
 
 ```python
-import os
-from datetime import datetime
+from app.services.user import create_user
 ```
 
 ---
 
-## 相対import
+## 実務ポイント
 
-```python
-from .models import User
+```text
+・循環参照に注意
+・レイヤーをまたぐimportを意識
 ```
 
 ---
 
-## ポイント
+## NG
 
-* 循環参照に注意
-* importはファイル先頭が基本
-* 必要なものだけimport
+```text
+View → Repository直接呼び出し
+```
 
 ---
 
-# testing（pytest）
+# ファイル分割
+
+## 指針
+
+```text
+・1ファイル1責務
+・巨大ファイルを作らない
+```
+
+---
+
+## 目安
+
+* 300行超えたら分割検討
+
+---
+
+# テスト（pytest）
 
 ## 基本
 
@@ -167,13 +180,6 @@ from .models import User
 def test_add():
     assert 1 + 2 == 3
 ```
-
----
-
-## 特徴
-
-* assertそのまま使う
-* シンプル
 
 ---
 
@@ -189,19 +195,37 @@ def test_error():
 
 ---
 
-## fixture
+## 実務ポイント
+
+```text
+・Service中心にテスト
+・外部依存はmock
+・テストは設計の一部
+```
+
+---
+
+# fixture
 
 ```python
 import pytest
 
 @pytest.fixture
 def user():
-    return User(name="Alice")
+    return {"name": "Alice"}
 ```
 
 ---
 
-## mock
+## ポイント
+
+```text
+テストデータの共通化
+```
+
+---
+
+# mock
 
 ```python
 from unittest.mock import patch
@@ -213,30 +237,15 @@ def test(mock_send):
 
 ---
 
-## ポイント
+## 実務ポイント
 
-* 小さくテスト
-* 外部依存はmock
-* DBを直接触らないテストも重要
-
----
-
-# random / seed
-
-## 再現性確保
-
-```python
-import random
-
-random.seed(1234)
+```text
+・外部API
+・メール
+・Celery
 ```
 
----
-
-## 用途
-
-* テスト
-* デバッグ
+は必ずmock
 
 ---
 
@@ -253,41 +262,51 @@ with open("file.txt") as f:
 
 ## ポイント
 
-* withで自動close
-* 明示的close不要
+```text
+withで自動close
+```
+
+---
+
+# random / seed
+
+```python
+import random
+
+random.seed(1234)
+```
+
+---
+
+## 用途
+
+```text
+テストの再現性確保
+```
 
 ---
 
 # GC / リソース管理
 
-## 例
+## 基本
 
-```python
-import gc
-
-gc.get_objects()
+```text
+通常は意識不要
 ```
 
 ---
 
-## ポイント
+## 例外
 
-* 通常は意識不要
-* ファイルや接続は明示的に閉じる
+```text
+・ファイル
+・DB接続
+・外部接続
+```
 
 ---
 
 # atexit
-
-## 概要
-
-```text
-終了時処理登録
-```
-
----
-
-## 例
 
 ```python
 import atexit
@@ -297,9 +316,19 @@ atexit.register(cleanup)
 
 ---
 
-# 実務での設計ポイント
+## 用途
 
-## 関数を小さくする
+```text
+終了時処理
+```
+
+---
+
+# 設計観点（重要）
+
+---
+
+## ① 関数は小さく
 
 ```text
 1関数1責務
@@ -307,7 +336,7 @@ atexit.register(cleanup)
 
 ---
 
-## 副作用を減らす
+## ② 副作用を減らす
 
 ```text
 状態変更を最小化
@@ -315,10 +344,18 @@ atexit.register(cleanup)
 
 ---
 
-## pure function寄りにする
+## ③ pure function寄り
 
 ```text
 入力 → 出力
+```
+
+---
+
+## ④ 依存を減らす
+
+```text
+テストしやすくする
 ```
 
 ---
@@ -330,6 +367,7 @@ atexit.register(cleanup)
 * グローバル変数多用
 * 例外握り潰し
 * import循環
+* 型ヒントなし
 
 ---
 
@@ -339,17 +377,6 @@ atexit.register(cleanup)
 | --------- | ---------------- |
 | Logger    | logging          |
 | Exception | raise            |
-| DI        | fixture / import |
+| DI        | import / fixture |
 | Mockito   | mock             |
 | JUnit     | pytest           |
-
----
-
-# まとめ
-
-* loggingは必須
-* 例外は設計の一部
-* pytestが基本
-* 型ヒントは積極的に使う
-* 小さく分割する
-
