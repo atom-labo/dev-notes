@@ -2,20 +2,22 @@
 
 ## 概要
 
-React / Next.jsにおけるアーキテクチャ設計は、
+React / Next.jsのアーキテクチャは、
 
-- 依存関係の整理
-- 責務分離
-- フレームワーク依存の隔離
-- 再利用性
+```txt
+責務分離
+依存関係の整理
+フレームワーク依存の隔離
+再利用性
+````
 
 を目的とする。
 
 ---
 
-## 基本思想
+# 基本思想
 
-### 1. 依存方向は一方向
+## 1. 依存方向は一方向
 
 ```txt
 pages
@@ -25,13 +27,11 @@ features
 shared
 ↓
 libs
-````
-
-逆依存は禁止する。
+```
 
 ---
 
-### 2. フレームワーク依存の隔離
+## 2. フレームワーク依存の隔離
 
 ```txt
 Next.js依存（pages / context）
@@ -40,17 +40,17 @@ Next.js依存（pages / context）
 
 ---
 
-### 3. UIとロジックの分離
+## 3. UIとロジックの分離
 
 ```txt
 UI（Component）
-ロジック（hooks / context）
+ロジック（hooks）
 データ取得（api）
 ```
 
 ---
 
-## レイヤー構造（実務）
+# レイヤー構造例
 
 ```txt
 src/
@@ -63,21 +63,21 @@ src/
 
 ---
 
-## 各レイヤーの役割
+# 各レイヤーの役割
 
 ---
 
-### pages（ルーティング層）
+## pages（ルーティング層）
 
 ```txt
 - URLと画面の紐付け
 - getServerSidePropsの定義
-- featuresへの委譲
+- featuresへ委譲
 ```
 
 ---
 
-### features/pages（画面単位）
+## features/pages（画面単位）
 
 ```txt
 - ページの本体
@@ -87,7 +87,7 @@ src/
 
 ---
 
-### shared-features（共通機能）
+## shared-features（共通機能）
 
 ```txt
 - API呼び出し
@@ -97,7 +97,7 @@ src/
 
 ---
 
-### libs（基盤）
+## libs（基盤）
 
 ```txt
 - axios設定
@@ -106,7 +106,7 @@ src/
 
 ---
 
-### parts（UI部品）
+## parts（UI部品）
 
 ```txt
 - Button / Input
@@ -115,7 +115,7 @@ src/
 
 ---
 
-## SSRパターン（重要）
+# SSRパターン
 
 ```txt
 request
@@ -124,31 +124,32 @@ pages
 ↓
 getServerSideProps
 ↓
-データ取得関数（api）
+API取得
 ↓
-props
+props生成
 ↓
 Component
 ```
 
 ---
 
-### ポイント
+## ポイント
 
-* SSR時にデータ取得
-* Componentはpropsのみ受け取る
-* ComponentでAPI通信しない
+```txt
+ComponentでAPIを呼ばない
+props駆動にする
+```
 
 ---
 
-## Client初期化パターン
+# Client初期化パターン
 
 ```txt
 Component
 ↓
-useEffect / custom hook
+usePageInitialization
 ↓
-初期化処理
+認証チェック
 ↓
 API取得
 ↓
@@ -159,14 +160,59 @@ state更新
 
 ---
 
-### 用途
+## 用途
 
-* 認証が必要なページ
-* クライアント依存の処理（localStorageなど）
+```txt
+- 認証ページ
+- localStorage依存
+```
 
 ---
 
-## API層設計
+# 認証・セッション設計
+
+## 前提
+
+```txt
+localStorage / Cookie / メモリ
+```
+
+---
+
+## Client認証パターン
+
+```txt
+Page
+↓
+初期化Hook
+↓
+getCurrentUser
+↓
+成功 → 続行
+失敗 → ログインへ
+```
+
+---
+
+## axiosとの連携
+
+```txt
+request → 認証ヘッダー付与
+response → 401でリダイレクト
+```
+
+---
+
+## SSRとの関係
+
+```txt
+localStorageはサーバーで使えない
+→ 認証はClientで行う
+```
+
+---
+
+# API層設計
 
 ```txt
 Component
@@ -175,23 +221,22 @@ hooks
 ↓
 api.ts
 ↓
-httpClient（axios）
-↓
-Backend API
+httpClient
 ```
 
 ---
 
-### ルール
+## ルール
 
-* 画面から直接axiosを呼ばない
-* 1API = 1関数
-* 型を定義する
-* APIパスは定数化
+```txt
+- 1API = 1関数
+- UIからaxiosを呼ばない
+- 型を定義する
+```
 
 ---
 
-## axios設計
+# axios設計
 
 ```txt
 httpClient
@@ -200,14 +245,16 @@ httpClientWithCredentials
 
 ---
 
-### 役割
+## 役割
 
-* httpClient → 認証不要
-* httpClientWithCredentials → 認証付き
+```txt
+httpClient → 公開API
+httpClientWithCredentials → 認証API
+```
 
 ---
 
-### interceptor
+## interceptor
 
 ```txt
 request → ヘッダー付与
@@ -216,23 +263,45 @@ response → エラー処理
 
 ---
 
-## コンポーネント設計
+# データ変換（Presenter）
+
+```txt
+APIレスポンス
+↓
+UI用データに変換
+↓
+Component
+```
+
+---
+
+## ポイント
+
+```txt
+API構造をUIに持ち込まない
+```
+
+---
+
+# コンポーネント設計
 
 ```txt
 Container（ロジック）
+↓
 Presentational（UI）
 ```
 
 ---
 
-### 原則
+## 原則
 
-* UIはpropsのみで動く
-* APIを直接呼ばない
+```txt
+UIはpropsのみで動く
+```
 
 ---
 
-## 依存ルール
+# 依存ルール
 
 ```txt
 OK
@@ -245,9 +314,11 @@ features → pages
 
 ---
 
-## アンチパターン
+# アンチパターン
 
-### pages肥大化
+---
+
+## ❌ pages肥大化
 
 ```txt
 ロジックを全部書く
@@ -255,15 +326,15 @@ features → pages
 
 ---
 
-### UIにAPIを書く
+## ❌ UIにAPIを書く
 
 ```txt
-axiosを直接呼ぶ
+axios直書き
 ```
 
 ---
 
-### 逆依存
+## ❌ 逆依存
 
 ```txt
 shared → features
@@ -271,7 +342,7 @@ shared → features
 
 ---
 
-## Vueとの対応
+# Vueとの対応
 
 | Vue         | React              |
 | ----------- | ------------------ |
@@ -282,9 +353,10 @@ shared → features
 
 ---
 
-## まとめ
+# まとめ
 
 * 依存方向の設計が最重要
 * SSRとClient初期化を使い分ける
 * API層を分離する
-* フレームワーク依存を外側に閉じ込める
+* 認証はClientで扱うことが多い
+* Presenter層でUIとデータを分離する

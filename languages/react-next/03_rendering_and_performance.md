@@ -2,299 +2,317 @@
 
 ## 概要
 
-Reactは「再レンダリング前提」で動作する。  
-パフォーマンス最適化は重要だが、**前提理解を誤ると逆効果になる**。
-
----
-
-## 再レンダリングとは
-
-```jsx
-function Component() {
-  console.log("render")
-  return <div />
-}
-````
-
-再レンダリングが起きる条件：
-
-* state変更
-* props変更
-* 親コンポーネントの再レンダリング
-
----
-
-## 重要な前提
-
-> コンポーネントは「再実行される」のが正常
-
----
-
-## Vueとの違い
-
-| Vue        | React    |
-| ---------- | -------- |
-| 部分的に更新     | 関数ごと再実行  |
-| リアクティブ依存追跡 | 明示的な再実行  |
-| 再描画を意識しにくい | 再実行前提で設計 |
-
----
-
-## 再レンダリングの流れ
+Reactのパフォーマンスは主に以下で決まる。
 
 ```txt
-state変更
+再レンダリング
+計算コスト
+DOM描画コスト
+通信（API）
+````
+
+---
+
+# 1. 基本理解
+
+## Reactのレンダリング
+
+```txt
+state / props変更
 ↓
-コンポーネント関数再実行
+Component再実行
 ↓
-新しいUI生成（仮想DOM）
+差分計算（Virtual DOM）
 ↓
-差分だけ実DOMに反映
+DOM更新
 ```
 
 ---
 
-## 誤解
+## ポイント
 
-### ❌ 再レンダリング = 重い
+```txt
+関数コンポーネントは「再実行」される
+```
 
-→ 基本的には軽い
+---
 
-理由：
+# 2. 再レンダリングの仕組み
 
-* 仮想DOMで差分更新
-* 関数実行は軽量
+## 親が更新されると
+
+```txt
+Parent再レンダリング
+↓
+Childも再レンダリング
+```
 
 ---
 
 ## 問題になるケース
 
-* 重い計算がある
-* 大量リスト
-* 不要な子コンポーネントまで再描画
-* APIなど副作用が無駄に走る
-
----
-
-## 再レンダリングの伝播
-
-```jsx
-function Parent() {
-  return <Child />
-}
+```txt
+不要な再レンダリング
 ```
 
-Parentが再レンダリングされると：
+---
 
-→ Childも再レンダリングされる
+# 3. よくある原因
 
 ---
 
-## 不要な再レンダリングの原因
+## ① 毎回新しいオブジェクト
 
-### 関数の再生成
+```tsx
+<Child options={{ sort: "asc" }} />
+```
 
-```jsx
+---
+
+## ② 毎回新しい関数
+
+```tsx
 <Child onClick={() => doSomething()} />
 ```
 
-毎回新しい関数になる
-
 ---
 
-### オブジェクトの再生成
+## ③ 重い計算
 
-```jsx
-<Child style={{ color: "red" }} />
+```tsx
+const result = heavyCalculation(data)
 ```
 
-毎回新しいオブジェクト
+---
+
+# 4. 最適化手段
 
 ---
 
-## 最適化手法
+## useMemo（値のキャッシュ）
 
----
-
-### React.memo
-
-```jsx
-const Child = React.memo(function Child(props) {
-  return <div>{props.value}</div>
-})
+```tsx
+const value = useMemo(() => {
+  return compute(data)
+}, [data])
 ```
 
-* propsが同じなら再レンダリングしない
-
 ---
 
-### useMemo
+## useCallback（関数のキャッシュ）
 
-```jsx
-const value = useMemo(() => compute(data), [data])
-```
-
-* 値の再計算を防ぐ
-
----
-
-### useCallback
-
-```jsx
+```tsx
 const handleClick = useCallback(() => {
   doSomething()
 }, [])
 ```
 
-* 関数の参照を固定する
-
 ---
 
-## 3つの役割
+## React.memo（コンポーネントのメモ化）
 
-| 対象      | 手法          |
-| ------- | ----------- |
-| 値       | useMemo     |
-| 関数      | useCallback |
-| コンポーネント | React.memo  |
-
----
-
-## 組み合わせパターン
-
-```jsx
-const Child = React.memo(({ data, onClick }) => {
-  return <button onClick={onClick}>{data}</button>
+```tsx
+const Child = React.memo(function Child(props) {
+  return <div>{props.label}</div>
 })
-
-function Parent({ items }) {
-  const data = useMemo(() => compute(items), [items])
-
-  const handleClick = useCallback(() => {
-    doSomething()
-  }, [])
-
-  return <Child data={data} onClick={handleClick} />
-}
 ```
 
 ---
 
-## 参照の重要性
+# 5. 使い分け
 
-Reactは基本的に `===` で比較する。
+## useMemo
 
-```jsx
-[] === [] // false
-{} === {} // false
+```txt
+重い計算結果をキャッシュ
 ```
 
-👉 新しい配列・オブジェクトは別物として扱われる
-
 ---
 
-## よくあるNG
+## useCallback
 
-### useMemoしないケース
-
-```jsx
-const filtered = items.filter(...)
+```txt
+子コンポーネントに渡す関数を安定させる
 ```
 
-→ 毎回新しい配列
-→ Childが再レンダリング
-
 ---
 
-### useMemoあり
+## React.memo
 
-```jsx
-const filtered = useMemo(() => items.filter(...), [items])
+```txt
+propsが変わらない限り再レンダリングしない
 ```
 
-→ 同じ参照を維持
-
 ---
 
-## 最適化の判断基準
+# 6. 判断基準
 
-### 最適化する
+## 最適化する
 
-* リストが重い（数百〜数千件）
-* 明らかに再描画が遅い
-* DevToolsで問題が確認できる
-
----
-
-### 最適化しない
-
-* 小規模コンポーネント
-* 軽い計算
-* 体感差がない
-
----
-
-## アンチパターン
-
-### 最初から最適化
-
-```jsx
-useMemo(...)
-useCallback(...)
+```txt
+- 大量リスト
+- 重い計算
+- 体感で遅い
+- memo化された子にpropsを渡す
 ```
 
-→ 可読性低下
-→ バグ増加
-→ 効果がないことが多い
-
 ---
 
-### useEffectで制御
+## 最適化しない
 
-```jsx
-useEffect(() => {
-  setState(...)
-}, [])
+```txt
+- 単純な画面
+- 軽い処理
+- 問題が発生していない
 ```
 
-→ 設計ミスの可能性
+---
+
+# 7. 計測方法
+
+## React DevTools（Profiler）
+
+確認できる内容：
+
+```txt
+どのコンポーネントが
+何回
+どれくらい時間をかけて
+再レンダリングされたか
+```
 
 ---
 
-## 設計の基本
+## Chrome DevTools
 
-* stateは最小限
-* 派生値は計算で出す
-* propsはシンプルに保つ
-* UIは純粋関数として扱う
+### Performanceタブ
 
----
-
-## React的な考え方
-
-### NG
-
-* 再レンダリングを避ける設計
+```txt
+CPU / Rendering / Paint
+```
 
 ---
 
-### OK
+### Networkタブ
 
-* 再レンダリングされても問題ない設計
-
----
-
-## デバッグ観点
-
-* console.logでrender回数を見る
-* 不要な再描画を特定する
-* DevToolsで確認
+```txt
+APIの遅延
+リクエスト回数
+```
 
 ---
 
-## まとめ
+# 8. APIと描画は分けて考える
 
-* 再レンダリングはReactの基本動作
-* 問題になるのは一部ケースのみ
-* 最適化は必要になってから行う
-* 参照（===）が重要な概念
+```txt
+画面が遅い原因
+↓
+・レンダリングか？
+・通信か？
+```
+
+---
+
+# 9. 実務で多い改善
+
+```txt
+- 不要な再レンダリング削減
+- useEffectの依存見直し
+- APIの二重取得削減
+- 重い処理のメモ化
+```
+
+---
+
+# 10. アンチパターン
+
+---
+
+## ❌ 全部useMemo
+
+```txt
+逆に遅くなる
+```
+
+---
+
+## ❌ 全部useCallback
+
+```txt
+可読性低下
+```
+
+---
+
+## ❌ React.memo乱用
+
+```txt
+効果がないケースも多い
+```
+
+---
+
+## ❌ 原因を測らない
+
+```txt
+勘で最適化
+```
+
+---
+
+# 11. 再レンダリング最適化の流れ
+
+```txt
+① 遅い箇所を特定
+② 原因分析（再レンダリング or API）
+③ 必要な箇所だけ最適化
+```
+
+---
+
+# 12. useEffectとの関係
+
+```txt
+useEffectの依存配列ミス
+→ 無駄な再レンダリング
+```
+
+---
+
+# 13. データ変換との関係
+
+```txt
+毎回map / filter
+↓
+無駄な計算
+```
+
+---
+
+## 対策
+
+```tsx
+const items = useMemo(() => {
+  return transform(data)
+}, [data])
+```
+
+---
+
+# 14. Vueとの対応
+
+| Vue      | React       |
+| -------- | ----------- |
+| computed | useMemo     |
+| methods  | useCallback |
+| watch    | useEffect   |
+
+---
+
+# まとめ
+
+* 再レンダリングが基本コスト
+* 最適化は必要な箇所のみ
+* DevToolsで計測する
+* API遅延と描画遅延は分ける
+* useMemo / useCallbackは適切に使う

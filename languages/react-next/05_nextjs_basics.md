@@ -1,405 +1,329 @@
-# Next.js基礎
+# Next.js 基本
 
 ## 概要
 
-Next.jsはReactのフレームワークであり、
+Next.jsはReactベースのフレームワークで、以下を提供する。
 
+- SSR（Server Side Rendering）
+- SSG（Static Site Generation）
 - ルーティング
-- サーバーサイドレンダリング（SSR）
-- データ取得
-- 最適化
-
-などを提供する。
+- APIルート
+- パフォーマンス最適化
 
 ---
 
-## Reactとの違い
+## ファイルベースルーティング
 
-| React | Next.js |
-|---|---|
-| 単体ライブラリ | フレームワーク |
-| ルーティングなし | ファイルベースルーティング |
-| CSR中心 | SSR / SSG対応 |
-| 自由度高い | ある程度構造が決まっている |
-
----
-
-## ルーティング（pages Router）
+### 基本
 
 ```txt
-src/pages/
-├ index.tsx       → /
-├ users.tsx       → /users
-└ users/[id].tsx  → /users/:id
+pages/
+├ index.tsx        → /
+├ users.tsx        → /users
+└ about.tsx        → /about
 ````
 
-* ファイル名がURLになる
-* `[id]` は動的ルーティング
+👉 ファイル構造 = URL
 
 ---
 
-## ページの基本構造
+### 動的ルーティング
 
-```tsx
-const Page = () => {
-  return <div>Hello</div>
-}
+```txt
+pages/users/[id].tsx
+```
 
-export default Page
+```txt
+/users/123
+/users/abc
 ```
 
 ---
 
-## getServerSideProps（SSR）
+### パラメータ取得
+
+#### Client
+
+```ts
+const { query } = useRouter()
+query.id
+```
+
+---
+
+#### SSR
+
+```ts
+export const getServerSideProps = async (context) => {
+  context.params.id
+}
+```
+
+---
+
+### 複数パラメータ
+
+```txt
+pages/users/[userId]/posts/[postId].tsx
+```
+
+---
+
+### catch-all
+
+```txt
+pages/[...slug].tsx
+```
+
+```txt
+/a/b/c → ["a", "b", "c"]
+```
+
+---
+
+### 注意点
+
+```txt
+同階層に複数の動的ルートは置けない
+例：[id].tsx と [name].tsx は競合する
+```
+
+---
+
+## ページ遷移
+
+### Link（推奨）
 
 ```tsx
+import Link from "next/link"
+
+<Link href="/users">Users</Link>
+```
+
+---
+
+### router
+
+```tsx
+import { useRouter } from "next/router"
+
+const router = useRouter()
+
+router.push("/users")
+```
+
+---
+
+### push / replace
+
+```ts
+router.push("/users")     // 履歴に残る
+router.replace("/login")  // 履歴を上書き
+```
+
+---
+
+### 使い分け
+
+```txt
+通常遷移 → push
+リダイレクト → replace
+```
+
+---
+
+## クエリパラメータ
+
+### URL
+
+```txt
+/users?id=123
+```
+
+---
+
+### 取得
+
+```ts
+router.query.id
+```
+
+---
+
+### 遷移時
+
+```ts
+router.push({
+  pathname: "/users",
+  query: { id: 123 }
+})
+```
+
+---
+
+## routerの重要プロパティ
+
+```ts
+const router = useRouter()
+```
+
+---
+
+### pathname
+
+```ts
+router.pathname
+```
+
+```txt
+/users/[id]
+```
+
+---
+
+### asPath
+
+```ts
+router.asPath
+```
+
+```txt
+/users/123?id=1
+```
+
+---
+
+### query
+
+```ts
+router.query
+```
+
+---
+
+### isReady（重要）
+
+```ts
+if (!router.isReady) return
+```
+
+理由：
+
+```txt
+初回レンダリングではqueryが未確定
+```
+
+---
+
+## SSR
+
+### getServerSideProps
+
+```ts
 export const getServerSideProps = async (context) => {
+  const data = await fetchData()
+
   return {
-    props: {}
+    props: { data }
   }
 }
 ```
 
-### 特徴
-
-* リクエストごとにサーバーで実行
-* SEOに強い
-* 常に最新データ
-
 ---
-
-## contextの中身
-
-```ts
-context.req
-context.res
-context.query
-context.params
-```
-
----
-
-## 戻り値
-
-```ts
-return {
-  props: {}
-}
-```
-
-または：
-
-```ts
-return { notFound: true }
-return { redirect: { destination: "/", permanent: false } }
-```
-
----
-
-## App Router（新しい方式）
-
-```txt
-src/app/
-└ page.tsx
-```
-
-```tsx
-export default async function Page() {
-  const data = await fetch(...)
-  return <div>{data}</div>
-}
-```
-
----
-
-## Server Component（重要）
-
-デフォルトはServer Component。
-
-```tsx
-export default async function Page() {
-  const data = await fetch(...)
-}
-```
 
 ### 特徴
 
-* サーバーで実行
-* JSバンドルに含まれない
-* 初期表示が高速
+```txt
+毎リクエスト実行
+常に最新データ
+SEOに強い
+```
 
 ---
 
-## Client Component
+## SSG
 
-```tsx
-"use client"
+### getStaticProps
 
-import { useState } from "react"
+```ts
+export const getStaticProps = async () => {
+  const data = await fetchData()
 
-export default function Component() {
-  const [count, setCount] = useState(0)
+  return {
+    props: { data }
+  }
 }
 ```
 
+---
+
 ### 特徴
 
-* ブラウザで実行
-* state / eventが使える
+```txt
+ビルド時に生成
+高速
+SEOに強い
+```
 
 ---
 
-## Server / Client の使い分け
+## ISR
 
-### Server
-
-* データ取得
-* 初期表示
-* SEO
-
----
-
-### Client
-
-* ボタン操作
-* フォーム
-* モーダル
-* アニメーション
+```ts
+export const getStaticProps = async () => {
+  return {
+    props: { data },
+    revalidate: 60
+  }
+}
+```
 
 ---
 
-## 設計の基本
+### 特徴
 
 ```txt
-Server（デフォルト）
-↓
-必要な部分だけClient
+一定時間で再生成
+SSG + 更新性
 ```
 
 ---
 
-## NGパターン
-
-### 全部client
-
-```tsx
-"use client"
-```
-
-→ パフォーマンス悪化
-
----
-
-### Serverで状態管理
-
-```tsx
-const [count, setCount] = useState(0)
-```
-
-→ 不可
-
----
-
-## データ取得
-
-### Server
-
-```tsx
-const data = await fetch(...)
-```
-
----
-
-### Client
-
-```tsx
-useEffect(() => {
-  fetch(...)
-}, [])
-```
-
----
-
-## SSR / SSG / ISR
-
-### SSR（Server Side Rendering）
-
-* 毎リクエストごとにHTML生成
-* 常に最新データ
-* 初回表示はやや遅い
-
----
-
-### SSG（Static Site Generation）
-
-* ビルド時にHTML生成
-* 非常に高速
-* データは固定
-
----
-
-### ISR（Incremental Static Regeneration）
-
-* 一定時間ごとに再生成
-* SSGとSSRの中間
-
----
-
-## SSR / SSG / ISR の使い分け（実務）
-
-### SSRを使う
+## SSR / SSG / ISR 使い分け
 
 ```txt
-- ログインユーザーごとに内容が変わる
-- リアルタイム性が必要
-- 常に最新データが必要
+SSR → 常に最新データ（一覧・検索）
+SSG → ほぼ更新されない（LP・記事）
+ISR → 更新頻度中（商品一覧など）
 ```
-
-例：
-
-* マイページ
-* ダッシュボード
-* 管理画面
 
 ---
 
-### SSGを使う
+## Next.jsの役割
 
 ```txt
-- 内容がほぼ変わらない
-- SEOが重要
-- パフォーマンス重視
-```
-
-例：
-
-* LP（ランディングページ）
-* 会社紹介
-* ブログ記事
-
----
-
-### ISRを使う
-
-```txt
-- 更新頻度はあるがリアルタイムでなくてよい
-- SEOも重要
-- パフォーマンスも重要
-```
-
-例：
-
-* 商品一覧
-* ニュース一覧
-* メディア記事
-
----
-
-## 判断フロー（実務用）
-
-```txt
-ユーザーごとに内容が変わる？
-→ YES → SSR
-
-NO ↓
-
-更新頻度が低い？
-→ YES → SSG
-
-NO ↓
-
-ISR
+ルーティング
+SSR / SSG
+データ取得
+パフォーマンス最適化
 ```
 
 ---
 
-## Vue（Nuxt）との違い
+## Vueとの対応
 
-| Nuxt          | Next.js                  |
-| ------------- | ------------------------ |
-| SSR中心         | Server/Client分離          |
-| asyncData     | fetch / Server Component |
-| ファイルベースルーティング | 同様                       |
-
----
-
-## 実務での構成（重要）
-
-今回のような構成：
-
-```txt
-pages/
-└ routingのみ
-
-features/pages/
-└ 実装本体
-```
-
-### 意図
-
-* Next.js依存を分離
-* テストしやすい
-* 可読性向上
-
----
-
-## 例
-
-```tsx
-// pages
-export { default } from "@/features/pages/xxx/Page"
-```
-
----
-
-## 判断基準
-
-* ルーティング → pages
-* 画面実装 → features
-* 共通ロジック → shared
-
----
-
-## アンチパターン
-
-### pagesに全部書く
-
-* ロジック肥大化
-* 再利用不可
-
----
-
-### Server / Clientを意識しない
-
-* パフォーマンス低下
-* バグの原因
-
----
-
-## SEO観点の補足
-
-### CSR（React単体）
-
-```txt
-HTMLが空
-→ SEO弱い
-```
-
----
-
-### SSR / SSG（Next.js）
-
-```txt
-HTMLに内容あり
-→ SEO強い
-```
+| Vue        | Next.js            |
+| ---------- | ------------------ |
+| Vue Router | pages              |
+| asyncData  | getServerSideProps |
+| SSG        | getStaticProps     |
 
 ---
 
 ## まとめ
 
-* Next.jsはReactの拡張
-* ルーティングとSSRを提供
-* Server / Clientの使い分けが重要
-* SSR / SSG / ISRを用途で使い分ける
-* 実務では構造設計が重要
+* ファイル構造でルーティングが決まる
+* 動的ルートはファイル名で定義
+* Link / routerで遷移
+* SSR / SSG / ISRを使い分ける
+* router.isReadyは実務で重要

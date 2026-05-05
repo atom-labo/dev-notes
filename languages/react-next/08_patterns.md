@@ -5,21 +5,21 @@
 React / Next.jsの実務では、
 
 ```txt
-「毎回考える」のではなく「パターンで組む」
+毎回ゼロから考えず、再利用可能なパターンで構築する
 ````
 
 ことが重要。
 
 ---
 
-## 1. SSRページパターン
+# 1. SSRページパターン
 
 ```txt
 pages
 ↓
 getServerSideProps
 ↓
-api関数
+データ取得
 ↓
 props生成
 ↓
@@ -28,43 +28,25 @@ Component描画
 
 ---
 
-### 実装イメージ
+## ポイント
 
-```ts
-export const getServerSideProps = async () => {
-  const data = await fetchData()
-
-  return {
-    props: { data }
-  }
-}
-```
-
-```tsx
-export const Page = ({ data }) => {
-  return <Component data={data} />
-}
+```txt
+Componentで直接APIを呼ばない
+props駆動にする
 ```
 
 ---
 
-### ポイント
-
-* ComponentでAPIを呼ばない
-* props駆動にする
-
----
-
-## 2. Client初期化パターン（認証ページ）
+# 2. Client初期化パターン
 
 ```txt
 Component
 ↓
-usePageInitialization
+初期化Hook
 ↓
 認証チェック
 ↓
-API取得
+データ取得
 ↓
 state更新
 ↓
@@ -73,100 +55,66 @@ state更新
 
 ---
 
-### 実装イメージ
+## 用途
 
-```tsx
-const { isLoading, isInitialized } = usePageInitialization(async () => {
-  await getCurrentUser()
-  const { data } = await getUserProfile()
-  setState(data)
-})
+```txt
+認証ページ
+初期化処理
+リダイレクト制御
 ```
 
 ---
 
-### ポイント
-
-* 認証系はClientで処理
-* 初期化処理を共通Hookにまとめる
-
----
-
-## 3. API分離パターン
+# 3. API分離パターン
 
 ```txt
 Component
 ↓
 hooks
 ↓
-api.ts
+api関数
 ↓
-axios
+HTTPクライアント
 ```
 
 ---
 
-### api.ts
-
-```ts
-export const getUsers = async () =>
-  httpClient.get("/users")
-```
-
----
-
-### ポイント
-
-* UIからaxiosを呼ばない
-* APIは関数化
-
----
-
-## 4. axios共通化パターン
+## ルール
 
 ```txt
-libs/Axios.ts
+UIから直接HTTP通信しない
+1API = 1関数
 ```
 
 ---
 
-### パターン
+# 4. HTTPクライアント共通化
 
 ```txt
 httpClient
-httpClientWithCredentials
+httpClientWithAuth
 ```
 
 ---
 
-### 用途
+## 用途
 
 ```txt
-httpClient → 公開API
-httpClientWithCredentials → 認証API
+通常API / 認証付きAPIの分離
 ```
 
 ---
 
-## 5. interceptorパターン
+# 5. interceptorパターン
 
 ```txt
 request → ヘッダー付与
-response → エラー処理
+response → エラー共通処理
 ```
 
 ---
 
-### 例
-
-```ts
-httpClient.interceptors.request.use(...)
-httpClient.interceptors.response.use(...)
-```
-
----
-
-## 6. Container / Presentational
+# 6. Container / Presentational
 
 ```txt
 Container（ロジック）
@@ -176,31 +124,22 @@ Presentational（UI）
 
 ---
 
-### 例
+## 原則
 
-```tsx
-// Container
-const Page = () => {
-  const data = useData()
-  return <Component data={data} />
-}
-
-// UI
-const Component = ({ data }) => {
-  return <div>{data}</div>
-}
+```txt
+UIはpropsのみで動く
 ```
 
 ---
 
-## 7. カスタムフックパターン
+# 7. カスタムフックパターン
 
 ```ts
-export function useUsers() {
-  const [data, setData] = useState([])
+export function useData() {
+  const [data, setData] = useState(null)
 
   useEffect(() => {
-    fetchUsers().then(setData)
+    fetchData().then(setData)
   }, [])
 
   return data
@@ -209,36 +148,94 @@ export function useUsers() {
 
 ---
 
-### 用途
-
-* ロジックの再利用
-* UIと分離
-
----
-
-## 8. フォームパターン（React Hook Form）
+## メリット
 
 ```txt
-useForm
-↓
-zodResolver
-↓
-schema
+ロジックの再利用
+UIと分離
 ```
 
 ---
 
-### 実装イメージ
+# 8. フォームパターン例
+
+## 構成
+
+```txt
+FormComponent
+↓
+useForm
+↓
+schema（バリデーション）
+↓
+API送信
+```
+
+---
+
+## 送信フロー
+
+```txt
+入力
+↓
+handleSubmit
+↓
+バリデーション
+↓
+API送信
+↓
+成功 / 失敗
+```
+
+---
+
+## 送信中制御
 
 ```tsx
-const form = useForm({
-  resolver: zodResolver(schema)
+const [isSubmitting, setIsSubmitting] = useState(false)
+
+<button disabled={isSubmitting}>送信</button>
+```
+
+---
+
+## APIエラー表示
+
+```tsx
+setError("root", {
+  message: "送信に失敗しました"
 })
 ```
 
 ---
 
-## 9. ローディング制御
+## Controller（外部UI）
+
+```tsx
+<Controller
+  name="date"
+  control={control}
+  render={({ field }) => (
+    <DatePicker {...field} />
+  )}
+/>
+```
+
+---
+
+## 初期値 / リセット
+
+```tsx
+useForm({
+  defaultValues: { name: "" }
+})
+
+reset()
+```
+
+---
+
+# 9. ローディング制御
 
 ```txt
 isLoading
@@ -247,7 +244,7 @@ isInitialized
 
 ---
 
-### パターン
+## パターン
 
 ```tsx
 if (isLoading && !isInitialized) return <Loading />
@@ -255,38 +252,38 @@ if (isLoading && !isInitialized) return <Loading />
 
 ---
 
-## 10. リダイレクト制御
+# 10. リダイレクト制御
 
-```txt
-router.push
-router.replace
+```ts
+router.push()
+router.replace()
 ```
 
 ---
 
-### パターン
+## パターン
 
 ```ts
-if (!isAuthorized) {
+if (!allowed) {
   router.replace("/404")
 }
 ```
 
 ---
 
-## 11. データ変換パターン
+# 11. データ変換（Presenter）
 
 ```txt
 APIレスポンス
 ↓
 UI用データに変換
 ↓
-Componentに渡す
+Component
 ```
 
 ---
 
-### 例
+## 例
 
 ```ts
 const items = data.map(x => ({
@@ -297,30 +294,33 @@ const items = data.map(x => ({
 
 ---
 
-## 12. SEO設定パターン
+# 12. 非同期処理パターン
 
-```txt
-Component内でSEO設定
+## 並列
+
+```ts
+await Promise.all([
+  fetchA(),
+  fetchB()
+])
 ```
 
 ---
 
-### 例
+## 依存あり
 
-```tsx
-<DummySeo
-  title="..."
-  description="..."
-/>
+```ts
+const a = await fetchA()
+await fetchB(a.id)
 ```
 
 ---
 
-## 13. ディレクトリ構成パターン
+# 13. ディレクトリ構成例
 
 ```txt
-features/pages/
-└ xxx/
+features/
+└ page/
   ├ Component.tsx
   ├ api.ts
   ├ hooks.ts
@@ -329,26 +329,21 @@ features/pages/
 
 ---
 
-## 14. 状態管理パターン
+# 14. 状態管理パターン
 
 ```txt
-小規模
-→ useState / props
-
-中規模
-→ useContext
-
-大規模
-→ 状態管理ライブラリ
+小規模 → useState
+中規模 → Context
+大規模 → 状態管理ライブラリ
 ```
 
 ---
 
-## 15. アンチパターン
+# 15. アンチパターン
 
 ---
 
-### UIにロジック詰め込み
+## ❌ UIにロジック詰め込み
 
 ```txt
 Componentに全部書く
@@ -356,7 +351,7 @@ Componentに全部書く
 
 ---
 
-### axios直書き
+## ❌ 直接HTTP通信
 
 ```txt
 useEffectで直接API
@@ -364,15 +359,15 @@ useEffectで直接API
 
 ---
 
-### SSR + Client二重取得
+## ❌ 二重データ取得
 
 ```txt
-無駄な通信
+Server + Client
 ```
 
 ---
 
-### useEffect乱用
+## ❌ useEffect乱用
 
 ```txt
 依存配列ミス
@@ -380,10 +375,9 @@ useEffectで直接API
 
 ---
 
-## まとめ
+# まとめ
 
 * 実務はパターンで組む
-* SSR / Clientを使い分ける
-* API層を分離する
-* 共通処理はHookにまとめる
-* UIは純粋に保つ
+* データ取得とUIを分離する
+* フォーム・非同期・認証は定型化できる
+* 再利用性を意識する

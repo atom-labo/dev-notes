@@ -2,122 +2,107 @@
 
 ## 概要
 
-React / Next.jsでよく遭遇する問題と、その原因・対処を整理する。  
-まずは「典型パターン」を押さえることが重要。
+React / Next.jsでよく発生する問題を、
+
+```txt
+原因
+→ なぜ起きるか
+→ 対処
+````
+
+の観点で整理する。
 
 ---
 
-## 1. 無限レンダリング
+# 1. 無限レンダリング
 
-### 症状
+## 症状
 
-- 画面が固まる
-- CPU使用率が上がる
-- コンソールが大量出力
+* 画面が固まる
+* consoleが大量出力
 
 ---
 
-### 原因
+## 原因
 
-```jsx
+```tsx
 useEffect(() => {
   setState(...)
 }, [state])
-````
-
----
-
-### なぜ起きるか
-
-```txt
-state変更
-↓
-useEffect発火
-↓
-setState
-↓
-state変更
-↓
-ループ
 ```
 
 ---
 
-### 対処
+## なぜ
+
+```txt
+state更新 → useEffect → setState → ループ
+```
+
+---
+
+## 対処
 
 * 依存配列を見直す
-* state更新条件を制御する
-* useEffectの用途を見直す
+* 更新条件を制御する
 
 ---
 
-## 2. useEffectが意図通り動かない
+# 2. useEffectが意図通り動かない
 
 ---
 
-### ケース①：更新されない
+## ケース①：更新されない
 
-```jsx
+```tsx
 useEffect(() => {
   console.log(count)
 }, [])
 ```
 
----
-
 ### 原因
 
-* 依存配列に `count` がない
-
----
-
-### 対処
-
-```jsx
-useEffect(() => {
-  console.log(count)
-}, [count])
+```txt
+依存配列にcountがない
 ```
 
 ---
 
-### ケース②：毎回実行される
+## ケース②：毎回実行される
 
-```jsx
+```tsx
 useEffect(() => {
   fetchData()
 }, [fn])
 ```
 
----
-
 ### 原因
 
-* `fn` が毎回新しく生成されている
+```txt
+fnが毎回新しく生成される
+```
 
 ---
 
-### 対処
+## 対処
 
-```jsx
+```tsx
 const fn = useCallback(() => {}, [])
 ```
 
 ---
 
-## 3. stale closure（古い値を参照）
+# 3. stale closure
+
+## 症状
+
+* 古いstateを参照する
 
 ---
 
-### 症状
+## 原因
 
-* stateが更新されているのに古い値が使われる
-
----
-
-### 例
-
-```jsx
+```tsx
 useEffect(() => {
   console.log(count)
 }, [])
@@ -125,54 +110,33 @@ useEffect(() => {
 
 ---
 
-### 原因
-
-* 初回レンダリング時の値を保持している
-
----
-
-### 対処
+## 対処
 
 * 依存配列を正しく書く
-* useRefや関数型更新を検討
 
 ---
 
-## 4. Hydrationエラー（Next.js）
+# 4. Hydrationエラー（Next.js）
+
+## 症状
+
+```txt
+Text content does not match server-rendered HTML
+```
 
 ---
 
-### 症状
+## 原因
 
-* Warning: Text content does not match server-rendered HTML
-
----
-
-### 原因
-
-* ServerとClientでHTMLが異なる
-
----
-
-### 例
-
-```jsx
+```tsx
 const value = Math.random()
 ```
 
 ---
 
-### 対処
+## 対処
 
-* クライアント側でのみ実行
-
-```jsx
-"use client"
-```
-
-または
-
-```jsx
+```tsx
 useEffect(() => {
   setValue(Math.random())
 }, [])
@@ -180,240 +144,302 @@ useEffect(() => {
 
 ---
 
-## 5. keyの問題
+# 5. key問題
+
+## 症状
+
+* リストが崩れる
 
 ---
 
-### 症状
+## 原因
 
-* リストの表示が崩れる
-* 状態が意図しない位置に残る
-
----
-
-### 原因
-
-```jsx
-items.map((item, index) => (
-  <Item key={index} />
-))
+```tsx
+key={index}
 ```
 
 ---
 
-### 対処
+## 対処
 
-```jsx
-<Item key={item.id} />
+```tsx
+key={item.id}
 ```
 
 ---
 
-## 6. イベントが即実行される
+# 6. イベント即実行
 
----
+## NG
 
-### NG
-
-```jsx
+```tsx
 <button onClick={handleClick()} />
 ```
 
 ---
 
-### 原因
+## 対処
 
-* render時に関数が実行されている
-
----
-
-### 対処
-
-```jsx
+```tsx
 <button onClick={handleClick} />
 ```
 
-または
+---
 
-```jsx
-<button onClick={() => handleClick(id)} />
+# 7. 再レンダリング過多
+
+## 原因
+
+* 毎回新しいオブジェクト
+* 毎回新しい関数
+
+---
+
+## 対処
+
+```tsx
+useMemo
+useCallback
+React.memo
 ```
 
 ---
 
-## 7. 再レンダリングが多すぎる
+# 8. データ二重取得
 
----
-
-### 原因
-
-* 関数の再生成
-* オブジェクトの再生成
-
----
-
-### 対処
-
-```jsx
-useCallback(...)
-useMemo(...)
-React.memo(...)
-```
-
-※必要な場合のみ
-
----
-
-## 8. データが二重取得される
-
----
-
-### 原因
+## 原因
 
 ```txt
-Serverで取得
-↓
-Clientでも取得
+SSR + Client両方で取得
 ```
 
 ---
 
-### 対処
+## 対処
 
-* どちらかに統一
-* 初期データをpropsで渡す
-
----
-
-## 9. useEffectでasync直接使用
-
----
-
-### NG
-
-```jsx
-useEffect(async () => {
-  await fetch(...)
-}, [])
+```txt
+どちらかに統一
 ```
 
 ---
 
-### 対処
+# 9. useEffectでasync
 
-```jsx
+## NG
+
+```tsx
+useEffect(async () => {})
+```
+
+---
+
+## 対処
+
+```tsx
 useEffect(() => {
-  async function load() {
-    await fetch(...)
-  }
+  async function load() {}
   load()
 }, [])
 ```
 
 ---
 
-## 10. propsドリル
+# 10. Server / Client混同
+
+## 症状
+
+* useState使えない
+* イベント動かない
 
 ---
 
-### 症状
+## 原因
 
 ```txt
-A → B → C → D
+Server Componentで書いている
 ```
 
 ---
 
-### 対処
+## 対処
 
-* Contextを使う
-* 状態管理ライブラリを使う
-
----
-
-## 11. Server / Clientの混同（Next.js）
-
----
-
-### 症状
-
-* useStateが使えない
-* イベントが動かない
-
----
-
-### 原因
-
-* Server Componentで書いている
-
----
-
-### 対処
-
-```jsx
+```tsx
 "use client"
 ```
 
 ---
 
-## 12. fetchのキャッシュ問題
+# 11. router.queryがundefined
 
----
+## 原因
 
-### 症状
-
-* データが更新されない
-
----
-
-### 原因
-
-```jsx
-fetch(url)
-```
-
-→ デフォルトキャッシュ
-
----
-
-### 対処
-
-```jsx
-fetch(url, { cache: "no-store" })
-```
-
-または
-
-```jsx
-fetch(url, { next: { revalidate: 60 } })
+```txt
+初回レンダリングでは未確定
 ```
 
 ---
 
-## Vueとの違い（トラブル観点）
+## 対処
 
-| Vue        | React        |
-| ---------- | ------------ |
-| 自動依存追跡     | 手動（依存配列）     |
-| computed安全 | useMemoミスあり  |
-| watch安定    | useEffect罠あり |
-| 再描画制御簡単    | 再レンダリング前提    |
+```tsx
+if (!router.isReady) return
+```
 
 ---
 
-## 実務でのチェックポイント
+# 12. エラーハンドリング設計
 
-* useEffectの依存配列
-* stateの持ちすぎ
-* 不要な再レンダリング
-* Server / Clientの切り分け
-* API取得場所
+## 基本方針
+
+```txt
+エラーはレイヤーごとに責務分離
+```
 
 ---
 
-## まとめ
+## エラー分類
 
-* 多くの問題は「依存関係」と「再レンダリング」に起因
-* useEffectがトラブルの中心になりやすい
-* Server / Clientの理解も重要
-* まずは典型パターンを覚える
+```txt
+401 → 未認証
+403 → 権限なし
+404 → 存在しない
+500 → サーバーエラー
+```
+
+---
+
+## レイヤー責務
+
+```txt
+axios（interceptor）
+→ 共通処理
+
+api.ts
+→ throwするだけ
+
+hooks
+→ 状態管理
+
+Component
+→ UI表示
+```
+
+---
+
+## 実務パターン
+
+```txt
+401 → interceptorでログインへ
+404 → ページ単位でリダイレクト
+バリデーション → フォーム表示
+500 → toast or fallback UI
+```
+
+---
+
+## NGパターン
+
+```txt
+全部catchで404
+APIでエラー握りつぶす
+401をUIで処理
+```
+
+---
+
+# 13. 非同期処理ミス
+
+## ❌ 無駄な直列
+
+```tsx
+await fetchA()
+await fetchB()
+```
+
+---
+
+## ❌ Promise未await
+
+```tsx
+fetchData()
+```
+
+---
+
+## 対処
+
+```tsx
+await Promise.all([...])
+```
+
+---
+
+# 14. 認証系の落とし穴
+
+## ❌ SSRで認証API
+
+```txt
+localStorage使えない
+```
+
+---
+
+## 対処
+
+```txt
+Client側で初期化
+```
+
+---
+
+## ❌ 認証チェックしない
+
+```tsx
+await getUserProfile()
+```
+
+---
+
+# 15. UX問題
+
+## ❌ ローディングなし
+
+```txt
+画面が一瞬空白
+```
+
+---
+
+## ❌ エラー表示なし
+
+```txt
+ユーザーに何も伝わらない
+```
+
+---
+
+## 対処
+
+```tsx
+Loading / Error UIを出す
+```
+
+---
+
+# Vueとの違い（トラブル観点）
+
+| Vue        | React         |
+| ---------- | ------------- |
+| 自動依存追跡     | 手動依存配列        |
+| watch安定    | useEffectミス多い |
+| computed安全 | useMemoミスあり   |
+
+---
+
+# まとめ
+
+* 多くの問題は「依存関係」と「再レンダリング」
+* エラーはレイヤーごとに分離
+* router.isReadyは重要
+* 非同期処理ミスに注意
+* SSRとClientの違いを理解する

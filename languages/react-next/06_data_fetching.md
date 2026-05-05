@@ -6,18 +6,19 @@ React / Next.jsにおけるデータ取得は、
 
 ```txt
 どこで取得するか（Server / Client）
+どのレイヤーで責務を持つか
 ````
 
 が最重要。
 
 ---
 
-## 全体整理
+# 全体整理
 
 ```txt
 Serverで取得
-├ getServerSideProps（pages Router）
-└ Server Component（App Router）
+├ SSR（getServerSideProps）
+└ SSG / ISR
 
 Clientで取得
 ├ useEffect
@@ -26,14 +27,14 @@ Clientで取得
 
 ---
 
-## 1. SSR（Server Side Rendering）
+# 1. SSR（Server Side Rendering）
 
 ```txt
 request
 ↓
 getServerSideProps
 ↓
-API取得
+データ取得関数
 ↓
 props生成
 ↓
@@ -42,7 +43,7 @@ Component描画
 
 ---
 
-### 例
+## 例
 
 ```ts
 export const getServerSideProps = async () => {
@@ -56,32 +57,34 @@ export const getServerSideProps = async () => {
 
 ---
 
-### 特徴
-
-* 初期HTMLにデータが含まれる
-* SEOに強い
-* 常に最新データ
-
----
-
-### 向いているケース
+## 特徴
 
 ```txt
-- 公開ページ
-- SEO重要
-- 初期表示に必須のデータ
+- 初期HTMLにデータが含まれる
+- SEOに強い
+- 常に最新データ
 ```
 
 ---
 
-## 2. Client側取得
+## 向いているケース
+
+```txt
+- 公開ページ
+- 初期表示に必須のデータ
+- SEO重要ページ
+```
+
+---
+
+# 2. Client側取得
 
 ```txt
 Component
 ↓
 useEffect / custom hook
 ↓
-API取得
+データ取得
 ↓
 state更新
 ↓
@@ -90,7 +93,7 @@ state更新
 
 ---
 
-### 例
+## 例
 
 ```ts
 useEffect(() => {
@@ -100,124 +103,124 @@ useEffect(() => {
 
 ---
 
-### 特徴
+## 特徴
 
-* 初期HTMLにデータなし
-* ローディングが必要
-* SEOに弱い
+```txt
+- 初期HTMLにデータなし
+- ローディングが必要
+- SEOに弱い
+```
 
 ---
 
-### 向いているケース
+## 向いているケース
 
 ```txt
-- 認証ページ
+- 認証が必要なページ
 - ユーザー操作後の取得
-- localStorage依存
+- ブラウザ依存（localStorageなど）
 ```
 
 ---
 
-## 3. SSRとClientの使い分け（重要）
+# 3. SSRとClientの使い分け
 
 ```txt
-公開ページ
-→ SSR
-
-認証ページ
-→ Client
+公開ページ → Server
+認証ページ → Client
 ```
 
 ---
 
-### 理由
+## 理由
 
 ```txt
-認証情報（token / session）
-→ Client側でしか取得できない場合がある
+認証情報はClient側に依存するケースが多い
 ```
 
 ---
 
-## 4. API層の設計
+# 4. API層の設計
 
 ```txt
 Component
 ↓
 hooks
 ↓
-api.ts
+api関数
 ↓
-httpClient
+HTTPクライアント
 ```
 
 ---
 
-### api.ts
+## ルール
+
+```txt
+- UIから直接HTTP通信しない
+- 1API = 1関数
+- 型を明確にする
+```
+
+---
+
+## 例
 
 ```ts
-export const getUsers = async () => {
-  return httpClient.get("/users")
+export const getListData = async () => {
+  return httpClient.get("/items")
 }
 ```
 
 ---
 
-### ルール
-
-* 画面からaxiosを直接呼ばない
-* 1API = 1関数
-* 型を定義する
-
----
-
-## 5. axiosの共通化
+# 5. HTTPクライアントの共通化
 
 ```txt
-libs/Axios.ts
+共通HTTPクライアント
 ```
 
 ---
 
-### 例
+## 例
 
 ```ts
-export const httpClient = axios.create({
+export const httpClient = createClient({
   baseURL: "...",
-  timeout: 10000,
+  timeout: 10000
 })
 ```
 
 ---
 
-## 6. 認証付きAPI
+# 6. 認証付き通信
 
 ```txt
-httpClientWithCredentials
+認証付きクライアント
 ```
 
 ---
 
-### 仕組み
+## 仕組み
 
 ```txt
 request interceptor
-→ 認証ヘッダー付与
+→ 認証情報付与
 
 response interceptor
-→ 401時にリダイレクト
+→ エラー共通処理
 ```
 
 ---
 
-## 7. カスタムフックパターン
+# 7. カスタムフックパターン
 
 ```ts
-export function useUsers() {
-  const [data, setData] = useState([])
+export function useData() {
+  const [data, setData] = useState(null)
 
   useEffect(() => {
-    fetchUsers().then(setData)
+    fetchData().then(setData)
   }, [])
 
   return data
@@ -226,21 +229,25 @@ export function useUsers() {
 
 ---
 
-### メリット
+## メリット
 
-* 再利用可能
-* UIとロジック分離
+```txt
+- 再利用可能
+- UIとロジック分離
+```
 
 ---
 
-## 8. Client初期化パターン（重要）
+# 8. Client初期化パターン
 
 ```txt
 Component
 ↓
-usePageInitialization
+初期化Hook
 ↓
-API取得
+認証チェック
+↓
+データ取得
 ↓
 state更新
 ↓
@@ -249,7 +256,7 @@ state更新
 
 ---
 
-### 用途
+## 用途
 
 ```txt
 - 認証チェック
@@ -259,34 +266,72 @@ state更新
 
 ---
 
-## 9. エラーハンドリング
+# 9. 非同期処理
+
+## 直列（依存あり）
+
+```ts
+const a = await fetchA()
+const b = await fetchB(a.id)
+```
+
+---
+
+## 並列（依存なし）
+
+```ts
+const [a, b] = await Promise.all([
+  fetchA(),
+  fetchB()
+])
+```
+
+---
+
+## 注意点
+
+```txt
+- Promise.allはどれか1つ失敗で全体失敗
+```
+
+---
+
+## 個別処理
+
+```ts
+const results = await Promise.allSettled([...])
+```
+
+---
+
+# 10. エラーハンドリング
 
 ```ts
 try {
   await fetchData()
 } catch (e) {
-  // エラー処理
+  // 処理
 }
 ```
 
 ---
 
-### 実務で必要な分類
+## 実務分類
 
 ```txt
-- 401（未認証）
-- 403（権限なし）
-- 404（存在しない）
-- 500（サーバーエラー）
+401 → 未認証
+403 → 権限なし
+404 → 存在しない
+500 → サーバーエラー
 ```
 
 ---
 
-## 10. アンチパターン
+# 11. アンチパターン
 
 ---
 
-### UIで直接API呼び出し
+## ❌ UIで直接通信
 
 ```ts
 useEffect(() => {
@@ -296,50 +341,26 @@ useEffect(() => {
 
 ---
 
-### ServerとClientで二重取得
+## ❌ 二重取得
 
 ```txt
-SSR
-↓
-Clientでも再取得
+Server取得 + Client取得
 ```
 
 ---
 
-### useEffect依存ミス
+## ❌ 非同期ミス
 
 ```ts
-useEffect(() => {
-  fetchData()
-}, [])
+fetchData() // awaitなし
 ```
 
 ---
 
-## Vueとの対応
+# まとめ
 
-| Vue         | React              |
-| ----------- | ------------------ |
-| asyncData   | getServerSideProps |
-| onMounted   | useEffect          |
-| composables | custom hooks       |
-
----
-
-## 実務での基本戦略
-
-```txt
-1. まずSSRを検討
-2. 無理ならClient
-3. APIは分離
-4. hooksでラップ
-```
-
----
-
-## まとめ
-
-* データ取得は「どこでやるか」が最重要
+* データ取得は「場所」と「責務」で考える
 * SSRとClientを使い分ける
 * API層を分離する
-* 認証はClient側で扱うケースが多い
+* 非同期処理は直列/並列を意識する
+* エラーは適切に伝播させる
