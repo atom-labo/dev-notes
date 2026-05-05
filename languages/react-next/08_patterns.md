@@ -2,263 +2,206 @@
 
 ## 概要
 
-React / Next.jsの実務では、よく使う「実装パターン」を持っているかが重要。
-
-- 毎回ゼロから考えない
-- 一貫した設計にする
-- バグを減らす
-
----
-
-## 1. データ取得パターン（基本）
-
-### Serverで取得 → Clientで操作
-
-```tsx
-// Server
-export default async function Page() {
-  const data = await fetch(...)
-  return <ClientComponent initialData={data} />
-}
-````
-
-```jsx
-"use client"
-
-function ClientComponent({ initialData }) {
-  const [data, setData] = useState(initialData)
-}
-```
-
----
-
-### 判断基準
-
-* 初期表示 → Server
-* ユーザー操作 → Client
-
----
-
-## 2. フォーム処理
-
-### Controlled Component
-
-```jsx
-const [value, setValue] = useState("")
-
-<input value={value} onChange={e => setValue(e.target.value)} />
-```
-
----
-
-### 送信処理
-
-```jsx
-const handleSubmit = (e) => {
-  e.preventDefault()
-  submit(value)
-}
-```
-
----
-
-### 実務ポイント
-
-* 入力値はstateで管理
-* バリデーションは関数で分離
-* API呼び出しは別関数へ
-
----
-
-## 3. API呼び出しの分離
+React / Next.jsの実務では、
 
 ```txt
-features/pages/user/
-├ api.ts
-├ hooks.ts
-└ UserPage.tsx
+「毎回考える」のではなく「パターンで組む」
+````
+
+ことが重要。
+
+---
+
+## 1. SSRページパターン
+
+```txt
+pages
+↓
+getServerSideProps
+↓
+api関数
+↓
+props生成
+↓
+Component描画
+```
+
+---
+
+### 実装イメージ
+
+```ts
+export const getServerSideProps = async () => {
+  const data = await fetchData()
+
+  return {
+    props: { data }
+  }
+}
+```
+
+```tsx
+export const Page = ({ data }) => {
+  return <Component data={data} />
+}
+```
+
+---
+
+### ポイント
+
+* ComponentでAPIを呼ばない
+* props駆動にする
+
+---
+
+## 2. Client初期化パターン（認証ページ）
+
+```txt
+Component
+↓
+usePageInitialization
+↓
+認証チェック
+↓
+API取得
+↓
+state更新
+↓
+描画
+```
+
+---
+
+### 実装イメージ
+
+```tsx
+const { isLoading, isInitialized } = usePageInitialization(async () => {
+  await getCurrentUser()
+  const { data } = await getUserProfile()
+  setState(data)
+})
+```
+
+---
+
+### ポイント
+
+* 認証系はClientで処理
+* 初期化処理を共通Hookにまとめる
+
+---
+
+## 3. API分離パターン
+
+```txt
+Component
+↓
+hooks
+↓
+api.ts
+↓
+axios
 ```
 
 ---
 
 ### api.ts
 
-```js
-export async function fetchUsers() {
-  const res = await fetch("/api/users")
-  return res.json()
-}
+```ts
+export const getUsers = async () =>
+  httpClient.get("/users")
 ```
 
 ---
 
-### hooks.ts
+### ポイント
 
-```js
-export function useUsers() {
-  const [users, setUsers] = useState([])
-
-  useEffect(() => {
-    fetchUsers().then(setUsers)
-  }, [])
-
-  return users
-}
-```
+* UIからaxiosを呼ばない
+* APIは関数化
 
 ---
 
-## 4. ローディング・エラー管理
+## 4. axios共通化パターン
 
-```jsx
-const [loading, setLoading] = useState(true)
-const [error, setError] = useState(null)
+```txt
+libs/Axios.ts
 ```
 
 ---
-
-```jsx
-if (loading) return <Loading />
-if (error) return <Error />
-```
-
----
-
-### SWR / React Queryを使う場合
-
-```jsx
-const { data, error, isLoading } = useSWR(...)
-```
-
-👉 状態管理が簡潔になる
-
----
-
-## 5. モーダル管理
 
 ### パターン
 
-```jsx
-const [isOpen, setIsOpen] = useState(false)
-```
-
----
-
-```jsx
-{isOpen && <Modal onClose={() => setIsOpen(false)} />}
-```
-
----
-
-### ポイント
-
-* 表示状態は親が管理
-* Modalは表示だけ担当
-
----
-
-## 6. リスト表示
-
-```jsx
-{items.map(item => (
-  <Item key={item.id} item={item} />
-))}
-```
-
----
-
-### 注意
-
-* `key` は必須
-* indexは基本使わない
-
----
-
-## 7. フィルタ・検索
-
-```jsx
-const filtered = useMemo(() => {
-  return items.filter(item => item.name.includes(keyword))
-}, [items, keyword])
-```
-
----
-
-### ポイント
-
-* filterはuseMemoで最適化
-* 入力はuseStateで管理
-
----
-
-## 8. イベントハンドラ
-
-```jsx
-<button onClick={handleClick} />
-```
-
----
-
-### 引数付き
-
-```jsx
-<button onClick={() => handleClick(id)} />
-```
-
----
-
-### NG
-
-```jsx
-<button onClick={handleClick()} />
-```
-
----
-
-## 9. 状態の持ち上げ
-
 ```txt
-Parent
- ├ ChildA
- └ ChildB
-```
-
-→ Parentにstateを置く
-
----
-
-## 10. Contextの利用
-
-```jsx
-const UserContext = createContext(null)
-```
-
----
-
-```jsx
-<UserContext.Provider value={user}>
-  <App />
-</UserContext.Provider>
+httpClient
+httpClientWithCredentials
 ```
 
 ---
 
 ### 用途
 
-* propsドリル回避
-* グローバル状態
+```txt
+httpClient → 公開API
+httpClientWithCredentials → 認証API
+```
 
 ---
 
-## 11. カスタムフックパターン
+## 5. interceptorパターン
 
-```jsx
-function useFetch(url) {
-  const [data, setData] = useState(null)
+```txt
+request → ヘッダー付与
+response → エラー処理
+```
+
+---
+
+### 例
+
+```ts
+httpClient.interceptors.request.use(...)
+httpClient.interceptors.response.use(...)
+```
+
+---
+
+## 6. Container / Presentational
+
+```txt
+Container（ロジック）
+↓
+Presentational（UI）
+```
+
+---
+
+### 例
+
+```tsx
+// Container
+const Page = () => {
+  const data = useData()
+  return <Component data={data} />
+}
+
+// UI
+const Component = ({ data }) => {
+  return <div>{data}</div>
+}
+```
+
+---
+
+## 7. カスタムフックパターン
+
+```ts
+export function useUsers() {
+  const [data, setData] = useState([])
 
   useEffect(() => {
-    fetch(url).then(res => res.json()).then(setData)
-  }, [url])
+    fetchUsers().then(setData)
+  }, [])
 
   return data
 }
@@ -266,118 +209,181 @@ function useFetch(url) {
 
 ---
 
-## 12. レイアウトパターン
+### 用途
 
-```jsx
-function Layout({ children }) {
-  return (
-    <div>
-      <Header />
-      {children}
-    </div>
-  )
+* ロジックの再利用
+* UIと分離
+
+---
+
+## 8. フォームパターン（React Hook Form）
+
+```txt
+useForm
+↓
+zodResolver
+↓
+schema
+```
+
+---
+
+### 実装イメージ
+
+```tsx
+const form = useForm({
+  resolver: zodResolver(schema)
+})
+```
+
+---
+
+## 9. ローディング制御
+
+```txt
+isLoading
+isInitialized
+```
+
+---
+
+### パターン
+
+```tsx
+if (isLoading && !isInitialized) return <Loading />
+```
+
+---
+
+## 10. リダイレクト制御
+
+```txt
+router.push
+router.replace
+```
+
+---
+
+### パターン
+
+```ts
+if (!isAuthorized) {
+  router.replace("/404")
 }
 ```
 
 ---
 
-## 13. ページ構成（実務）
+## 11. データ変換パターン
 
 ```txt
-pages/
-└ routingのみ
-
-features/pages/
-└ 実装本体
-```
-
----
-
-## 14. ハイブリッドデータ取得
-
-```txt
-Server（初期データ）
+APIレスポンス
 ↓
-Client（追加取得）
+UI用データに変換
+↓
+Componentに渡す
 ```
 
 ---
 
-## 15. パフォーマンスパターン
+### 例
 
-```jsx
-const data = useMemo(() => compute(items), [items])
-const handleClick = useCallback(() => {}, [])
-const Child = React.memo(...)
+```ts
+const items = data.map(x => ({
+  label: x.name,
+  value: x.id
+}))
 ```
 
 ---
 
-## Vueとの違い
-
-| Vue      | React             |
-| -------- | ----------------- |
-| v-model  | 手動                |
-| computed | useMemo           |
-| watch    | useEffect         |
-| emit     | callback          |
-| store    | Context / Zustand |
-
----
-
-## アンチパターン
-
----
-
-### useEffectでデータ生成
-
-```jsx
-useEffect(() => {
-  setValue(...)
-}, [])
-```
-
----
-
-### API直書き
-
-```jsx
-useEffect(() => {
-  fetch(...)
-}, [])
-```
-
-→ api.tsに分離
-
----
-
-### state過多
-
-```jsx
-const [fullName, setFullName]
-```
-
-→ 不要
-
----
-
-### 過剰useMemo / useCallback
-
----
-
-## 実務での基本戦略
+## 12. SEO設定パターン
 
 ```txt
-1. Serverでデータ取得
-2. UIとロジックを分離
-3. 必要なところだけClient化
-4. 最適化は後から
+Component内でSEO設定
+```
+
+---
+
+### 例
+
+```tsx
+<DummySeo
+  title="..."
+  description="..."
+/>
+```
+
+---
+
+## 13. ディレクトリ構成パターン
+
+```txt
+features/pages/
+└ xxx/
+  ├ Component.tsx
+  ├ api.ts
+  ├ hooks.ts
+  ├ types.ts
+```
+
+---
+
+## 14. 状態管理パターン
+
+```txt
+小規模
+→ useState / props
+
+中規模
+→ useContext
+
+大規模
+→ 状態管理ライブラリ
+```
+
+---
+
+## 15. アンチパターン
+
+---
+
+### UIにロジック詰め込み
+
+```txt
+Componentに全部書く
+```
+
+---
+
+### axios直書き
+
+```txt
+useEffectで直接API
+```
+
+---
+
+### SSR + Client二重取得
+
+```txt
+無駄な通信
+```
+
+---
+
+### useEffect乱用
+
+```txt
+依存配列ミス
 ```
 
 ---
 
 ## まとめ
 
-* 実務はパターンの積み重ね
-* 再利用可能な形で設計する
-* 一貫性が重要
+* 実務はパターンで組む
+* SSR / Clientを使い分ける
+* API層を分離する
+* 共通処理はHookにまとめる
+* UIは純粋に保つ
