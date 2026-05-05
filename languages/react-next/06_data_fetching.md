@@ -2,14 +2,13 @@
 
 ## 概要
 
-Next.jsでは、データ取得の方法が複数ある。
+React / Next.jsにおけるデータ取得は、
 
-- Server Component（推奨）
-- getServerSideProps（pages Router）
-- Client側（useEffect）
-- データ取得ライブラリ（SWR / React Query）
+```txt
+どこで取得するか（Server / Client）
+````
 
-👉 **どこで取得するか（Server or Client）が最重要**
+が最重要。
 
 ---
 
@@ -17,278 +16,330 @@ Next.jsでは、データ取得の方法が複数ある。
 
 ```txt
 Serverで取得
-├ Server Component（App Router）
-└ getServerSideProps（pages Router）
+├ getServerSideProps（pages Router）
+└ Server Component（App Router）
 
 Clientで取得
-└ useEffect / SWR / React Query
-````
-
----
-
-## 1. Server Componentでの取得（推奨）
-
-```tsx
-export default async function Page() {
-  const res = await fetch("https://api.example.com/users")
-  const users = await res.json()
-
-  return <div>{users.length}</div>
-}
-```
-
-### 特徴
-
-* サーバーで実行
-* 初期HTMLにデータが含まれる（SEO強い）
-* シンプル
-
----
-
-## fetchの挙動（重要）
-
-Next.jsの `fetch` はデフォルトでキャッシュされる。
-
-```tsx
-fetch(url, { cache: "force-cache" }) // デフォルト
+├ useEffect
+└ カスタムフック
 ```
 
 ---
 
-### キャッシュ制御
-
-```tsx
-fetch(url, { cache: "no-store" }) // SSR（毎回取得）
-```
-
-```tsx
-fetch(url, { next: { revalidate: 60 } }) // ISR（60秒ごと更新）
-```
-
----
-
-## 2. getServerSideProps（pages Router）
-
-```tsx
-export const getServerSideProps = async (context) => {
-  const res = await fetch("https://api.example.com/users")
-  const users = await res.json()
-
-  return {
-    props: { users }
-  }
-}
-```
-
-### 特徴
-
-* リクエストごとに実行（SSR）
-* contextが使える（req, resなど）
-* pages Router専用
-
----
-
-## 3. Clientでの取得（useEffect）
-
-```jsx
-const [users, setUsers] = useState([])
-
-useEffect(() => {
-  fetch("/api/users")
-    .then(res => res.json())
-    .then(setUsers)
-}, [])
-```
-
-### 特徴
-
-* 初期HTMLにはデータがない
-* SEOに弱い
-* ローディングが必要
-
----
-
-## 4. SWR / React Query
-
-### SWR
-
-```jsx
-import useSWR from "swr"
-
-const { data, error } = useSWR("/api/users", fetcher)
-```
-
----
-
-### React Query
-
-```jsx
-const { data } = useQuery({
-  queryKey: ["users"],
-  queryFn: fetchUsers
-})
-```
-
----
-
-### 特徴
-
-* キャッシュ管理
-* 再取得（revalidate）
-* ローディング管理
-* エラーハンドリング
-
----
-
-## Server vs Clientの判断
-
----
-
-### Serverで取得する
+## 1. SSR（Server Side Rendering）
 
 ```txt
-- 初期表示に必要
-- SEOが重要
-- データ取得が重い
-```
-
-例：
-
-* 記事ページ
-* 商品ページ
-* 一覧ページ
-
----
-
-### Clientで取得する
-
-```txt
-- ユーザー操作後に取得
-- リアルタイム更新
-- SEO不要
-```
-
-例：
-
-* フィルタリング
-* 検索
-* 無限スクロール
-* ダッシュボード
-
----
-
-## ハイブリッドパターン
-
-```txt
-Serverで初期データ取得
+request
 ↓
-Clientで追加取得
+getServerSideProps
+↓
+API取得
+↓
+props生成
+↓
+Component描画
 ```
 
 ---
 
 ### 例
 
-```tsx
-// Server
-const initialData = await fetch(...)
+```ts
+export const getServerSideProps = async () => {
+  const data = await fetchData()
 
-return <ClientComponent initialData={initialData} />
-```
-
-```jsx
-"use client"
-
-function ClientComponent({ initialData }) {
-  const [data, setData] = useState(initialData)
-
-  useEffect(() => {
-    fetch(...)
-  }, [])
+  return {
+    props: { data }
+  }
 }
 ```
 
 ---
 
-## よくあるアンチパターン
+### 特徴
+
+* 初期HTMLにデータが含まれる
+* SEOに強い
+* 常に最新データ
 
 ---
 
-### 初期データをClientで取得
+### 向いているケース
 
-```jsx
+```txt
+- 公開ページ
+- SEO重要
+- 初期表示に必須のデータ
+```
+
+---
+
+## 2. Client側取得
+
+```txt
+Component
+↓
+useEffect / custom hook
+↓
+API取得
+↓
+state更新
+↓
+描画
+```
+
+---
+
+### 例
+
+```ts
 useEffect(() => {
-  fetch(...)
+  fetchData()
 }, [])
 ```
 
-👉 SEO悪化
-👉 初期表示遅い
+---
+
+### 特徴
+
+* 初期HTMLにデータなし
+* ローディングが必要
+* SEOに弱い
+
+---
+
+### 向いているケース
+
+```txt
+- 認証ページ
+- ユーザー操作後の取得
+- localStorage依存
+```
+
+---
+
+## 3. SSRとClientの使い分け（重要）
+
+```txt
+公開ページ
+→ SSR
+
+認証ページ
+→ Client
+```
+
+---
+
+### 理由
+
+```txt
+認証情報（token / session）
+→ Client側でしか取得できない場合がある
+```
+
+---
+
+## 4. API層の設計
+
+```txt
+Component
+↓
+hooks
+↓
+api.ts
+↓
+httpClient
+```
+
+---
+
+### api.ts
+
+```ts
+export const getUsers = async () => {
+  return httpClient.get("/users")
+}
+```
+
+---
+
+### ルール
+
+* 画面からaxiosを直接呼ばない
+* 1API = 1関数
+* 型を定義する
+
+---
+
+## 5. axiosの共通化
+
+```txt
+libs/Axios.ts
+```
+
+---
+
+### 例
+
+```ts
+export const httpClient = axios.create({
+  baseURL: "...",
+  timeout: 10000,
+})
+```
+
+---
+
+## 6. 認証付きAPI
+
+```txt
+httpClientWithCredentials
+```
+
+---
+
+### 仕組み
+
+```txt
+request interceptor
+→ 認証ヘッダー付与
+
+response interceptor
+→ 401時にリダイレクト
+```
+
+---
+
+## 7. カスタムフックパターン
+
+```ts
+export function useUsers() {
+  const [data, setData] = useState([])
+
+  useEffect(() => {
+    fetchUsers().then(setData)
+  }, [])
+
+  return data
+}
+```
+
+---
+
+### メリット
+
+* 再利用可能
+* UIとロジック分離
+
+---
+
+## 8. Client初期化パターン（重要）
+
+```txt
+Component
+↓
+usePageInitialization
+↓
+API取得
+↓
+state更新
+↓
+描画
+```
+
+---
+
+### 用途
+
+```txt
+- 認証チェック
+- 初期データ取得
+- リダイレクト制御
+```
+
+---
+
+## 9. エラーハンドリング
+
+```ts
+try {
+  await fetchData()
+} catch (e) {
+  // エラー処理
+}
+```
+
+---
+
+### 実務で必要な分類
+
+```txt
+- 401（未認証）
+- 403（権限なし）
+- 404（存在しない）
+- 500（サーバーエラー）
+```
+
+---
+
+## 10. アンチパターン
+
+---
+
+### UIで直接API呼び出し
+
+```ts
+useEffect(() => {
+  axios.get(...)
+}, [])
+```
 
 ---
 
 ### ServerとClientで二重取得
 
 ```txt
-Serverで取得
+SSR
 ↓
 Clientでも再取得
 ```
-
-👉 無駄な通信
 
 ---
 
 ### useEffect依存ミス
 
-```jsx
+```ts
 useEffect(() => {
   fetchData()
 }, [])
 ```
 
-👉 本来更新すべきなのに更新されない
-
 ---
 
-## Vue（Nuxt）との違い
+## Vueとの対応
 
-| Nuxt      | Next.js          |
-| --------- | ---------------- |
-| asyncData | Server Component |
-| useFetch  | fetch            |
-| SSR自動     | 明示的に設計           |
+| Vue         | React              |
+| ----------- | ------------------ |
+| asyncData   | getServerSideProps |
+| onMounted   | useEffect          |
+| composables | custom hooks       |
 
 ---
 
 ## 実務での基本戦略
 
 ```txt
-1. まずServerで取得
-2. 必要ならClientで補完
+1. まずSSRを検討
+2. 無理ならClient
+3. APIは分離
+4. hooksでラップ
 ```
-
----
-
-## データ取得の責務分離
-
-```txt
-features/pages/
-├ Page.tsx
-├ api.ts
-├ hooks.ts
-└ types.ts
-```
-
-* API処理は分離
-* コンポーネントに直接書かない
 
 ---
 
 ## まとめ
 
 * データ取得は「どこでやるか」が最重要
-* Serverが基本
-* Clientは補助的に使う
-* fetchのキャッシュ理解が重要
-* ライブラリは必要に応じて導入
+* SSRとClientを使い分ける
+* API層を分離する
+* 認証はClient側で扱うケースが多い
